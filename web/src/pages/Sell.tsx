@@ -367,6 +367,7 @@ export default function Sell() {
 
   useEffect(() => {
     let cancelled = false
+    let hydratedFromOfflineCache = false
     if (!activeStoreId) {
       setProducts([])
       return () => {
@@ -377,6 +378,7 @@ export default function Sell() {
     loadCachedProducts<Product>({ storeId: activeStoreId })
       .then(cached => {
         if (cancelled || !cached.length) return
+        hydratedFromOfflineCache = true
         setProducts(
           cached
             .map((item, index) => mapFirestoreProduct((item as any).id ?? `cached-${index}`, item as any))
@@ -392,13 +394,25 @@ export default function Sell() {
       limit(PRODUCT_CACHE_LIMIT),
     )
 
-    const unsub = onSnapshot(q, snap => {
-      const rows: Product[] = snap.docs.map(d => mapFirestoreProduct(d.id, d.data()))
-      saveCachedProducts(rows.map(r => ({ ...r, id: undefined as any })), { storeId: activeStoreId }).catch(err =>
-        console.warn('[sell] Failed to cache products', err),
-      )
-      setProducts(rows)
-    })
+    const unsub = onSnapshot(
+      q,
+      snap => {
+        const rows: Product[] = snap.docs.map(d => mapFirestoreProduct(d.id, d.data()))
+
+        if (rows.length === 0 && hydratedFromOfflineCache && snap.metadata.fromCache) {
+          // Keep IndexedDB fallback list visible while offline instead of blanking the sell screen.
+          return
+        }
+
+        saveCachedProducts(rows.map(r => ({ ...r, id: undefined as any })), { storeId: activeStoreId }).catch(err =>
+          console.warn('[sell] Failed to cache products', err),
+        )
+        setProducts(rows)
+      },
+      err => {
+        console.warn('[sell] Failed to subscribe to products', err)
+      },
+    )
 
     return () => {
       cancelled = true
