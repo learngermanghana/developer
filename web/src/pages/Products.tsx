@@ -25,28 +25,7 @@ import {
 } from '../utils/offlineCache'
 import { normalizeBarcode } from '../utils/barcode'
 import { useStorePreferences } from '../hooks/useStorePreferences'
-
-type ItemType = 'product' | 'service' | 'made_to_order'
-
-type Product = {
-  id: string
-  name: string
-  sku: string | null
-  barcode: string | null // 🔹 normalized version for scanning
-  price: number | null
-  stockCount: number | null
-  reorderPoint: number | null
-  itemType: ItemType
-  taxRate?: number | null
-  expiryDate?: Date | null
-  manufacturerName?: string | null
-  productionDate?: Date | null
-  batchNumber?: string | null
-  showOnReceipt?: boolean
-  lastReceiptAt?: unknown
-  createdAt?: unknown
-  updatedAt?: unknown
-}
+import type { ItemType, Product } from '../types/product'
 
 type CachedProduct = Omit<Product, 'id'>
 type AbcBucket = 'A' | 'B' | 'C'
@@ -156,6 +135,8 @@ function mapFirestoreProduct(id: string, data: Record<string, unknown>): Product
   const manufacturerName = typeof data.manufacturerName === 'string' ? data.manufacturerName.trim() : ''
   const batchNumber = typeof data.batchNumber === 'string' ? data.batchNumber.trim() : ''
   const showOnReceipt = data.showOnReceipt === true
+  const imageUrl = typeof data.imageUrl === 'string' && data.imageUrl.trim() ? data.imageUrl.trim() : null
+  const imageAlt = typeof data.imageAlt === 'string' && data.imageAlt.trim() ? data.imageAlt.trim() : null
   const reorderPoint = sanitizeNumber(
     data.reorderPoint ?? data.reorderLevel ?? (data as any).reorderThreshold ?? null,
   )
@@ -169,6 +150,8 @@ function mapFirestoreProduct(id: string, data: Record<string, unknown>): Product
     stockCount: sanitizeNumber(data.stockCount),
     reorderPoint,
     itemType,
+    imageUrl,
+    imageAlt: imageUrl ? imageAlt || (nameRaw.trim() || 'Product image') : null,
     taxRate: sanitizeTaxRate(data.taxRate),
     expiryDate,
     productionDate,
@@ -194,6 +177,10 @@ async function backfillProductDefaults(
   if (!('productionDate' in data)) updates.productionDate = null
   if (!('batchNumber' in data)) updates.batchNumber = null
   if (!('showOnReceipt' in data)) updates.showOnReceipt = false
+  if (!('imageUrl' in data)) updates.imageUrl = null
+  if (!('imageAlt' in data) && typeof data.imageUrl === 'string' && data.imageUrl.trim()) {
+    updates.imageAlt = typeof data.name === 'string' && data.name.trim() ? data.name.trim() : null
+  }
 
   if (!Object.keys(updates).length) return
 
@@ -227,6 +214,18 @@ function parseDateInput(input: string): Date | null {
   const parsed = new Date(trimmed)
   if (Number.isNaN(parsed.getTime())) return null
   return parsed
+}
+
+function normalizeImageUrl(value: string): string | null {
+  const trimmed = value.trim()
+  if (!trimmed) return null
+  try {
+    const parsed = new URL(trimmed)
+    if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') return null
+    return parsed.toString()
+  } catch {
+    return null
+  }
 }
 
 function formatLastReceipt(lastReceiptAt: unknown): string {
@@ -289,6 +288,8 @@ export default function Products() {
   const [productionDateInput, setProductionDateInput] = useState('')
   const [batchNumberInput, setBatchNumberInput] = useState('')
   const [showOnReceiptInput, setShowOnReceiptInput] = useState(false)
+  const [imageUrlInput, setImageUrlInput] = useState('')
+  const [imageAltInput, setImageAltInput] = useState('')
 
   const [isSaving, setIsSaving] = useState(false)
   const [formStatus, setFormStatus] = useState<'idle' | 'success' | 'error'>('idle')
@@ -308,6 +309,8 @@ export default function Products() {
   const [editManufacturerInput, setEditManufacturerInput] = useState('')
   const [editBatchNumberInput, setEditBatchNumberInput] = useState('')
   const [editShowOnReceipt, setEditShowOnReceipt] = useState(false)
+  const [editImageUrlInput, setEditImageUrlInput] = useState('')
+  const [editImageAltInput, setEditImageAltInput] = useState('')
   const [smartCount, setSmartCount] = useState<SmartCountSession | null>(null)
   const [countActivity, setCountActivity] = useState<CountActivity[]>([])
   const [smartCountStatus, setSmartCountStatus] = useState<
@@ -634,6 +637,8 @@ export default function Products() {
     const productionDate = parseDateInput(productionDateInput)
     const manufacturerName = manufacturerInput.trim()
     const batchNumber = batchNumberInput.trim()
+    const normalizedImageUrl = normalizeImageUrl(imageUrlInput)
+    const imageAlt = imageAltInput.trim()
 
     if (!isService && (Number.isNaN(priceNumber) || priceNumber < 0)) {
       setFormStatus('error')
@@ -648,6 +653,11 @@ export default function Products() {
     ) {
       setFormStatus('error')
       setFormError('Opening stock must be zero or more.')
+      return
+    }
+    if (imageUrlInput.trim() && !normalizedImageUrl) {
+      setFormStatus('error')
+      setFormError('Image URL must start with http:// or https://')
       return
     }
 
@@ -682,6 +692,8 @@ export default function Products() {
         manufacturerName: !isService && manufacturerName ? manufacturerName : null,
         batchNumber: !isService && batchNumber ? batchNumber : null,
         showOnReceipt: !isService && showOnReceiptInput,
+        imageUrl: normalizedImageUrl,
+        imageAlt: normalizedImageUrl ? imageAlt || trimmedName : null,
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
       })
@@ -701,6 +713,8 @@ export default function Products() {
       setProductionDateInput('')
       setBatchNumberInput('')
       setShowOnReceiptInput(false)
+      setImageUrlInput('')
+      setImageAltInput('')
 
       await logInventoryActivity(
         `Added ${trimmedName}`,
@@ -829,6 +843,8 @@ export default function Products() {
     setEditManufacturerInput(product.manufacturerName ?? '')
     setEditBatchNumberInput(product.batchNumber ?? '')
     setEditShowOnReceipt(product.showOnReceipt === true)
+    setEditImageUrlInput(product.imageUrl ?? '')
+    setEditImageAltInput(product.imageAlt ?? '')
     setFormStatus('idle')
     setFormError(null)
   }
@@ -860,6 +876,8 @@ export default function Products() {
     const productionDate = parseDateInput(editProductionDateInput)
     const manufacturerName = editManufacturerInput.trim()
     const batchNumber = editBatchNumberInput.trim()
+    const normalizedImageUrl = normalizeImageUrl(editImageUrlInput)
+    const imageAlt = editImageAltInput.trim()
 
     if (!isStockTracked && (Number.isNaN(priceNumber) || priceNumber < 0)) {
       setFormStatus('error')
@@ -873,6 +891,11 @@ export default function Products() {
         setFormError('On hand must be zero or more.')
         return
       }
+    }
+    if (editImageUrlInput.trim() && !normalizedImageUrl) {
+      setFormStatus('error')
+      setFormError('Image URL must start with http:// or https://')
+      return
     }
 
     let finalPrice: number | null = null
@@ -909,6 +932,8 @@ export default function Products() {
         manufacturerName: isStockTracked && manufacturerName ? manufacturerName : null,
         batchNumber: isStockTracked && batchNumber ? batchNumber : null,
         showOnReceipt: isStockTracked && editShowOnReceipt,
+        imageUrl: normalizedImageUrl,
+        imageAlt: normalizedImageUrl ? imageAlt || trimmedName : null,
         updatedAt: serverTimestamp(),
       })
 
@@ -1292,6 +1317,33 @@ export default function Products() {
             )}
 
             <div className="field">
+              <label className="field__label" htmlFor="add-image-url">
+                Image URL <span className="field__optional">(optional)</span>
+              </label>
+              <input
+                id="add-image-url"
+                type="url"
+                placeholder="https://example.com/product-image.jpg"
+                value={imageUrlInput}
+                onChange={e => setImageUrlInput(e.target.value)}
+              />
+            </div>
+
+            <div className="field">
+              <label className="field__label" htmlFor="add-image-alt">
+                Image alt text <span className="field__optional">(optional)</span>
+              </label>
+              <input
+                id="add-image-alt"
+                type="text"
+                placeholder="Accessible image description"
+                value={imageAltInput}
+                onChange={e => setImageAltInput(e.target.value)}
+              />
+              <p className="field__hint">Defaults to the item name when left empty.</p>
+            </div>
+
+            <div className="field">
               <label className="field__label" htmlFor="add-opening-stock">
                 Opening stock
               </label>
@@ -1438,6 +1490,20 @@ export default function Products() {
                     className={`products-page__list-card ${isEditing ? 'is-editing' : ''}`}
                   >
                     <header className="products-page__list-card__header">
+                      <div className="products-page__thumb-wrap">
+                        {product.imageUrl ? (
+                          <img
+                            className="products-page__thumb"
+                            src={product.imageUrl}
+                            alt={product.imageAlt ?? product.name}
+                            loading="lazy"
+                          />
+                        ) : (
+                          <div className="products-page__thumb products-page__thumb--placeholder">
+                            No image
+                          </div>
+                        )}
+                      </div>
                       <div className="products-page__list-title">
                         <h4>{product.name}</h4>
                         <span className="products-page__badge products-page__badge--muted">
@@ -1508,6 +1574,36 @@ export default function Products() {
                           )}
                         </div>
                       )}
+
+                      <div className="products-page__list-field">
+                        <label className="field__label">Image URL</label>
+                        {isEditing ? (
+                          <input
+                            type="url"
+                            value={editImageUrlInput}
+                            onChange={event => setEditImageUrlInput(event.target.value)}
+                            placeholder="https://example.com/image.jpg"
+                          />
+                        ) : (
+                          <p className="products-page__list-value">{product.imageUrl || '—'}</p>
+                        )}
+                      </div>
+
+                      <div className="products-page__list-field">
+                        <label className="field__label">Image alt text</label>
+                        {isEditing ? (
+                          <input
+                            type="text"
+                            value={editImageAltInput}
+                            onChange={event => setEditImageAltInput(event.target.value)}
+                            placeholder="Accessible image description"
+                          />
+                        ) : (
+                          <p className="products-page__list-value">
+                            {product.imageAlt || product.name}
+                          </p>
+                        )}
+                      </div>
 
                       <div className="products-page__list-field">
                         <label className="field__label">VAT</label>
