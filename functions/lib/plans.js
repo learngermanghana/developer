@@ -19,6 +19,14 @@ const PLAN_CATALOG = {
         discountPercent: null,
         isDefault: true,
     },
+    'starter-biannual': {
+        id: 'starter-biannual',
+        label: 'Starter Biannual',
+        months: 6,
+        monthlyPriceUsd: 9,
+        totalPriceUsd: 54,
+        discountPercent: null,
+    },
     'starter-annual': {
         id: 'starter-annual',
         label: 'Starter Annual',
@@ -58,7 +66,9 @@ const PLAN_ALIAS_MAP = {
     // Starter
     starter: 'starter-monthly',
     'starter-monthly': 'starter-monthly',
+    'starter-biannual': 'starter-biannual',
     'starter-annual': 'starter-annual',
+    'starter-yearly': 'starter-annual',
     // Pro
     pro: 'pro-monthly',
     'pro-monthly': 'pro-monthly',
