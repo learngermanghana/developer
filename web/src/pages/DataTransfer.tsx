@@ -52,6 +52,8 @@ const ITEM_OPTIONAL_HEADERS: HeaderSpec[] = [
   { key: 'production_date', description: 'Use YYYY-MM-DD.' },
   { key: 'batch_number', description: 'Batch or lot code.' },
   { key: 'show_on_receipt', description: 'true or false.' },
+  { key: 'image_url', description: 'Public image URL (http/https).' },
+  { key: 'image_alt', description: 'Optional accessibility text for the image.' },
 ]
 const CUSTOMER_REQUIRED_HEADERS: HeaderSpec[] = [
   { key: 'name', description: 'Primary customer name.' },
@@ -132,6 +134,17 @@ function buildCsvFromRows(headers: string[], rows: string[][]) {
 function normalizeText(value: unknown): string {
   if (typeof value !== 'string') return ''
   return value.trim()
+}
+
+function normalizeHttpUrl(value: unknown): string {
+  const trimmed = normalizeText(value)
+  if (!trimmed) return ''
+  try {
+    const parsed = new URL(trimmed)
+    return parsed.protocol === 'http:' || parsed.protocol === 'https:' ? parsed.toString() : ''
+  } catch {
+    return ''
+  }
 }
 
 function normalizeKey(value: unknown): string {
@@ -280,6 +293,8 @@ export default function DataTransfer() {
           'production_date',
           'batch_number',
           'show_on_receipt',
+          'image_url',
+          'image_alt',
         ],
         [
           [
@@ -296,6 +311,8 @@ export default function DataTransfer() {
             '2024-06-01',
             'BATCH-01',
             'true',
+            'https://cdn.example.com/images/rice-5kg.jpg',
+            'Classic Rice 5kg product bag',
           ],
         ],
       ),
@@ -432,6 +449,8 @@ export default function DataTransfer() {
         const batchNumber = normalizeText(data.batchNumber)
         const showOnReceipt =
           data.showOnReceipt === true ? 'true' : data.showOnReceipt === false ? 'false' : ''
+        const imageUrl = normalizeHttpUrl(data.imageUrl)
+        const imageAlt = normalizeText(data.imageAlt)
 
         return [
           name,
@@ -447,6 +466,8 @@ export default function DataTransfer() {
           productionDate,
           batchNumber,
           showOnReceipt,
+          imageUrl,
+          imageAlt,
         ]
       })
 
@@ -469,6 +490,8 @@ export default function DataTransfer() {
         'production_date',
         'batch_number',
         'show_on_receipt',
+        'image_url',
+        'image_alt',
       ]
       downloadCsv('sedifex-items-export.csv', buildCsv(headers, rows))
       setItemsCsvExportStatus({ tone: 'success', message: 'Items CSV downloaded.' })
@@ -635,6 +658,8 @@ export default function DataTransfer() {
       const shouldSetProductionDate = headerIndex.production_date !== undefined
       const shouldSetBatchNumber = headerIndex.batch_number !== undefined
       const shouldSetShowOnReceipt = headerIndex.show_on_receipt !== undefined
+      const shouldSetImageUrl = headerIndex.image_url !== undefined
+      const shouldSetImageAlt = headerIndex.image_alt !== undefined
 
       let importedCount = 0
       let skippedCount = 0
@@ -669,6 +694,8 @@ export default function DataTransfer() {
         const manufacturerName = normalizeText(getRowValue(row, headerIndex, 'manufacturer_name'))
         const productionDate = normalizeDate(getRowValue(row, headerIndex, 'production_date'))
         const batchNumber = normalizeText(getRowValue(row, headerIndex, 'batch_number'))
+        const imageUrl = normalizeHttpUrl(getRowValue(row, headerIndex, 'image_url'))
+        const imageAlt = normalizeText(getRowValue(row, headerIndex, 'image_alt'))
         const showOnReceiptValue = normalizeText(
           getRowValue(row, headerIndex, 'show_on_receipt'),
         ).toLowerCase()
@@ -733,6 +760,12 @@ export default function DataTransfer() {
           shouldSetShowOnReceipt,
           'showOnReceipt',
           itemType === 'service' ? false : showOnReceipt ?? false,
+        )
+        setField(shouldSetImageUrl, 'imageUrl', imageUrl || null)
+        setField(
+          shouldSetImageAlt,
+          'imageAlt',
+          imageUrl ? imageAlt || name : null,
         )
 
         if (existingId) {

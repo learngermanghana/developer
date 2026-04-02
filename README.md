@@ -8,6 +8,48 @@ This repo is a drop-in starter for **Sedifex** (inventory & POS). It ships as a 
 - `firestore.rules` — Multi-tenant security rules scaffold
 - `.github/workflows/` — Optional CI for deploying Functions (if you want to use GitHub Actions)
 
+## Product image fields + downstream contract
+
+Sedifex product documents now support first-class image metadata:
+
+- `imageUrl?: string | null` — optional public image URL (`http://` or `https://` only in product forms/import).
+- `imageAlt?: string | null` — optional accessibility label; defaults to `name` when `imageUrl` exists and `imageAlt` is missing.
+
+### CSV import/export (items)
+
+- Required item headers remain unchanged: `name`, `price`.
+- New optional headers:
+  - `image_url`
+  - `image_alt`
+- Backward compatibility is preserved: legacy CSV files without these columns still import successfully.
+
+### Firestore behavior
+
+- Product create/edit persists `imageUrl` and `imageAlt` with existing `storeId` tenant scoping.
+- Product edits continue to refresh `updatedAt`.
+- Existing products without image fields remain valid and queryable.
+
+### Downstream consumer read contract (Glittering)
+
+- Use callable `listStoreProducts` (Cloud Functions) for tenant-safe reads.
+- Authenticated staff/owners can read products for their own `storeId`.
+- Return shape per product:
+  - `id`
+  - `storeId`
+  - `name`
+  - `price`
+  - `stockCount`
+  - `itemType`
+  - `imageUrl`
+  - `imageAlt`
+  - `updatedAt`
+
+### One-time backfill utility
+
+- Run `node functions/scripts/migrateProductImageFields.js` from the repo root (with Firebase admin credentials available) to backfill old records:
+  - set `imageUrl = null` when missing
+  - set `imageAlt = product.name` when `imageUrl` exists and `imageAlt` is missing
+
 ## Quick start (local dev)
 1) Install Node 20+.
 2) Go to `web/` and install deps:

@@ -4,6 +4,7 @@ import * as crypto from 'crypto'
 import { defineString } from 'firebase-functions/params'
 import { admin, defaultDb as db } from './firestore'
 import { normalizePhoneE164 } from './phone'
+import type { ProductReadModel } from './types/product'
 export { generateAiAdvice } from './aiAdvisor'
 export { exportDailyStoreReports } from './reports'
 export { checkSignupUnlock } from './paystack'
@@ -88,6 +89,11 @@ type BulkCreditsCheckoutPayload = {
   returnUrl?: unknown
   redirectUrl?: unknown
   metadata?: unknown
+}
+
+type ListStoreProductsPayload = {
+  storeId?: unknown
+  limit?: unknown
 }
 
 const VALID_ROLES = new Set(['owner', 'staff'])
@@ -476,6 +482,17 @@ function normalizeManageStaffPayload(data: ManageStaffPayload) {
     : 'invite'
 
   return { storeId, email, role, password, action }
+}
+
+function normalizeListProductsPayload(data: ListStoreProductsPayload | undefined) {
+  const storeId =
+    typeof data?.storeId === 'string' ? data.storeId.trim() : ''
+  const requestedLimit =
+    typeof data?.limit === 'number' && Number.isFinite(data.limit)
+      ? Math.floor(data.limit)
+      : 200
+  const limit = Math.min(Math.max(requestedLimit, 1), 500)
+  return { storeId, limit }
 }
 
 function timestampDaysFromNow(days: number) {
@@ -1583,6 +1600,66 @@ export const logPaymentReminder = functions.https.onCall(
 
     const ref = await db.collection('paymentReminderLogs').add(payload)
     return { ok: true, reminderId: ref.id }
+  },
+)
+
+/** ============================================================================
+ *  CALLABLE: listStoreProducts (staff, read-only)
+ * ==========================================================================*/
+
+export const listStoreProducts = functions.https.onCall(
+  async (data: ListStoreProductsPayload | undefined, context: functions.https.CallableContext) => {
+    assertStaffAccess(context)
+    const uid = context.auth!.uid
+    const { storeId: requestedStoreId, limit } = normalizeListProductsPayload(data)
+    const resolvedStoreId = await resolveStaffStoreId(uid)
+
+    if (requestedStoreId && requestedStoreId !== resolvedStoreId) {
+      throw new functions.https.HttpsError(
+        'permission-denied',
+        'You can only read products from your assigned store.',
+      )
+    }
+
+    const snapshot = await db
+      .collection('products')
+      .where('storeId', '==', resolvedStoreId)
+      .orderBy('updatedAt', 'desc')
+      .limit(limit)
+      .get()
+
+    const products: ProductReadModel[] = snapshot.docs.map(docSnap => {
+      const data = docSnap.data() as Record<string, unknown>
+      const name = typeof data.name === 'string' && data.name.trim() ? data.name.trim() : 'Untitled item'
+      const itemType =
+        data.itemType === 'service'
+          ? 'service'
+          : data.itemType === 'made_to_order'
+            ? 'made_to_order'
+            : 'product'
+
+      return {
+        id: docSnap.id,
+        storeId: resolvedStoreId,
+        name,
+        price: typeof data.price === 'number' && Number.isFinite(data.price) ? data.price : null,
+        stockCount:
+          typeof data.stockCount === 'number' && Number.isFinite(data.stockCount)
+            ? data.stockCount
+            : null,
+        itemType,
+        imageUrl:
+          typeof data.imageUrl === 'string' && data.imageUrl.trim() ? data.imageUrl.trim() : null,
+        imageAlt:
+          typeof data.imageAlt === 'string' && data.imageAlt.trim()
+            ? data.imageAlt.trim()
+            : null,
+        updatedAt:
+          data.updatedAt instanceof admin.firestore.Timestamp ? data.updatedAt : null,
+      }
+    })
+
+    return { storeId: resolvedStoreId, products }
   },
 )
 /** ============================================================================
