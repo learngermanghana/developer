@@ -33,7 +33,7 @@ var __importStar = (this && this.__importStar) || (function () {
     };
 })();
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.handlePaystackWebhook = exports.createBulkCreditsCheckout = exports.createCheckout = exports.createPaystackCheckout = exports.sendBulkMessage = exports.logPaymentReminder = exports.logReceiptShareAttempt = exports.logReceiptShare = exports.commitSale = exports.manageStaffAccount = exports.resolveStoreAccess = exports.initializeStore = exports.handleUserCreate = exports.checkSignupUnlock = exports.exportDailyStoreReports = exports.generateAiAdvice = void 0;
+exports.handlePaystackWebhook = exports.createBulkCreditsCheckout = exports.cancelPaystackSubscription = exports.createCheckout = exports.createPaystackCheckout = exports.sendBulkMessage = exports.logPaymentReminder = exports.logReceiptShareAttempt = exports.logReceiptShare = exports.commitSale = exports.manageStaffAccount = exports.resolveStoreAccess = exports.initializeStore = exports.handleUserCreate = exports.checkSignupUnlock = exports.exportDailyStoreReports = exports.generateAiAdvice = void 0;
 // functions/src/index.ts
 const functions = __importStar(require("firebase-functions/v1"));
 const crypto = __importStar(require("crypto"));
@@ -286,9 +286,22 @@ async function verifyOwnerForStore(uid, storeId) {
     const memberData = (memberSnap.data() ?? {});
     const memberRole = typeof memberData.role === 'string' ? memberData.role : '';
     const memberStoreId = typeof memberData.storeId === 'string' ? memberData.storeId : '';
-    if (memberRole !== 'owner' || memberStoreId !== storeId) {
-        throw new functions.https.HttpsError('permission-denied', 'Owner permission for this workspace is required');
+    if (memberRole === 'owner' && memberStoreId === storeId) {
+        return;
     }
+    const storeSnap = await firestore_1.defaultDb.collection('stores').doc(storeId).get();
+    const storeData = (storeSnap.data() ?? {});
+    const ownerUid = typeof storeData.ownerUid === 'string' ? storeData.ownerUid : '';
+    if (ownerUid && ownerUid === uid) {
+        await memberRef.set({
+            uid,
+            role: 'owner',
+            storeId,
+            updatedAt: firestore_1.admin.firestore.FieldValue.serverTimestamp(),
+        }, { merge: true });
+        return;
+    }
+    throw new functions.https.HttpsError('permission-denied', 'Owner permission for this workspace is required');
 }
 function assertStaffAccess(context) {
     assertAuthenticated(context);
@@ -487,6 +500,9 @@ exports.initializeStore = functions.https.onCall(async (data, context) => {
             paystackSubscriptionCode: previousBilling.paystackSubscriptionCode !== undefined
                 ? previousBilling.paystackSubscriptionCode
                 : null,
+            paystackEmailToken: previousBilling.paystackEmailToken !== undefined
+                ? previousBilling.paystackEmailToken
+                : null,
             paystackPlanCode: previousBilling.paystackPlanCode !== undefined
                 ? previousBilling.paystackPlanCode
                 : null,
@@ -643,6 +659,9 @@ exports.resolveStoreAccess = functions.https.onCall(async (data, context) => {
             : null,
         paystackSubscriptionCode: previousBilling.paystackSubscriptionCode !== undefined
             ? previousBilling.paystackSubscriptionCode
+            : null,
+        paystackEmailToken: previousBilling.paystackEmailToken !== undefined
+            ? previousBilling.paystackEmailToken
             : null,
         paystackPlanCode: previousBilling.paystackPlanCode !== undefined
             ? previousBilling.paystackPlanCode
@@ -1212,30 +1231,25 @@ function formatSmsAddress(phone) {
 }
 async function sendHubtelMessage(options) {
     const { clientId, clientSecret, to, from, body } = options;
-    const url = 'https://sms.hubtel.com/v1/messages/send';
-    const auth = Buffer.from(`${clientId}:${clientSecret}`).toString('base64');
-    const payload = {
-        From: from,
-        To: to,
-        Content: body,
-    };
-    const response = await fetch(url, {
-        method: 'POST',
-        headers: {
-            Authorization: `Basic ${auth}`,
-            'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(payload),
-    });
+    const url = new URL('https://smsc.hubtel.com/v1/messages/send');
+    url.search = new URLSearchParams({
+        clientid: clientId,
+        clientsecret: clientSecret,
+        from,
+        to,
+        content: body,
+    }).toString();
+    const response = await fetch(url, { method: 'GET' });
     if (!response.ok) {
         const errorText = await response.text();
-        throw new Error(`Hubtel error ${response.status}: ${errorText}`);
+        const details = errorText || response.statusText || 'Unknown error';
+        throw new Error(`Hubtel error ${response.status}: ${details}`);
     }
     return response.json();
 }
 exports.sendBulkMessage = functions.https.onCall(async (data, context) => {
     assertOwnerAccess(context);
-    const { storeId, message, recipients } = normalizeBulkMessagePayload(data);
+    const { storeId, channel, message, recipients } = normalizeBulkMessagePayload(data);
     await verifyOwnerForStore(context.auth.uid, storeId);
     const rateSnap = await firestore_1.defaultDb.collection('config').doc('hubtelRates').get();
     const legacyRateSnap = rateSnap.exists
@@ -1312,6 +1326,31 @@ exports.sendBulkMessage = functions.https.onCall(async (data, context) => {
             updatedAt: firestore_1.admin.firestore.FieldValue.serverTimestamp(),
         });
     }
+    const deliveryStatus = sent === attempted ? 'all_sent' : sent === 0 ? 'all_failed' : 'partial_failure';
+    try {
+        await storeRef.collection('bulkMessageRuns').add({
+            storeId,
+            ownerUid: context.auth?.uid ?? null,
+            channel,
+            message,
+            attempted,
+            sent,
+            failed: failures.length,
+            deliveryStatus,
+            creditsDebited: creditsRequired,
+            creditsRefunded: refundCredits,
+            recipients: recipients.map(recipient => ({
+                id: recipient.id ?? null,
+                name: recipient.name ?? null,
+                phone: recipient.phone ?? null,
+            })),
+            failures: failures.map(({ phone, error }) => ({ phone, error })),
+            createdAt: firestore_1.admin.firestore.FieldValue.serverTimestamp(),
+        });
+    }
+    catch (logError) {
+        console.error('[bulk-messaging] Failed to write bulk message run log', logError);
+    }
     return {
         ok: true,
         attempted,
@@ -1329,13 +1368,14 @@ const PAYSTACK_PUBLIC_KEY = (0, params_1.defineString)('PAYSTACK_PUBLIC_KEY');
 const PAYSTACK_STANDARD_PLAN_CODE = (0, params_1.defineString)('PAYSTACK_STANDARD_PLAN_CODE');
 // New: map frontend plan keys -> Paystack plan codes (optional).
 const PAYSTACK_STARTER_MONTHLY_PLAN_CODE = (0, params_1.defineString)('PAYSTACK_STARTER_MONTHLY_PLAN_CODE');
+const PAYSTACK_STARTER_BIANNUAL_PLAN_CODE = (0, params_1.defineString)('PAYSTACK_STARTER_BIANNUAL_PLAN_CODE');
 const PAYSTACK_STARTER_YEARLY_PLAN_CODE = (0, params_1.defineString)('PAYSTACK_STARTER_YEARLY_PLAN_CODE');
 const PAYSTACK_CURRENCY = (0, params_1.defineString)('PAYSTACK_CURRENCY');
 // Fixed packages (GHS)
 const BULK_CREDITS_PACKAGES = {
-    '100': { credits: 100, amount: 50 },
-    '500': { credits: 500, amount: 230 },
-    '1000': { credits: 1000, amount: 430 },
+    '10000': { credits: 10000, amount: 50 },
+    '50000': { credits: 50000, amount: 230 },
+    '100000': { credits: 100000, amount: 430 },
 };
 let paystackConfigLogged = false;
 function getPaystackConfig() {
@@ -1343,6 +1383,7 @@ function getPaystackConfig() {
     const publicKey = PAYSTACK_PUBLIC_KEY.value();
     const currency = PAYSTACK_CURRENCY.value() || 'GHS';
     const starterMonthly = PAYSTACK_STARTER_MONTHLY_PLAN_CODE.value() || PAYSTACK_STANDARD_PLAN_CODE.value();
+    const starterBiannual = PAYSTACK_STARTER_BIANNUAL_PLAN_CODE.value();
     const starterYearly = PAYSTACK_STARTER_YEARLY_PLAN_CODE.value();
     if (!paystackConfigLogged) {
         console.log('[paystack] startup config', {
@@ -1350,6 +1391,7 @@ function getPaystackConfig() {
             hasPublicKey: !!publicKey,
             currency,
             hasStarterMonthlyPlan: !!starterMonthly,
+            hasStarterBiannualPlan: !!starterBiannual,
             hasStarterYearlyPlan: !!starterYearly,
         });
         paystackConfigLogged = true;
@@ -1360,6 +1402,7 @@ function getPaystackConfig() {
         currency,
         plans: {
             'starter-monthly': starterMonthly,
+            'starter-biannual': starterBiannual,
             'starter-yearly': starterYearly,
         },
     };
@@ -1401,9 +1444,31 @@ function resolvePlanMonths(planKey) {
         return 12;
     if (lower.includes('annual'))
         return 12;
+    if (lower.includes('biannual'))
+        return 6;
+    if (lower.includes('semiannual'))
+        return 6;
+    if (lower.includes('semi-annual'))
+        return 6;
     if (lower.includes('month'))
         return 1;
     return 1;
+}
+function resolvePlanDefaultAmount(planKey) {
+    if (!planKey)
+        return 100;
+    const lower = planKey.toLowerCase();
+    if (lower.includes('year'))
+        return 1100;
+    if (lower.includes('annual'))
+        return 1100;
+    if (lower.includes('biannual'))
+        return 600;
+    if (lower.includes('semiannual'))
+        return 600;
+    if (lower.includes('semi-annual'))
+        return 600;
+    return 100;
 }
 function addMonths(base, months) {
     const d = new Date(base.getTime());
@@ -1460,9 +1525,7 @@ exports.createPaystackCheckout = functions.https.onCall(async (data, context) =>
     const amountInput = Number(payload.amount);
     const amountGhs = Number.isFinite(amountInput) && amountInput > 0
         ? amountInput
-        : planKey.toLowerCase().includes('year')
-            ? 1100
-            : 100;
+        : resolvePlanDefaultAmount(planKey);
     const amountMinorUnits = toMinorUnits(amountGhs);
     const reference = `${storeId}_${Date.now()}`;
     const callbackUrl = typeof payload.redirectUrl === 'string'
@@ -1558,6 +1621,120 @@ exports.createPaystackCheckout = functions.https.onCall(async (data, context) =>
 });
 // Alias so frontend name still works
 exports.createCheckout = exports.createPaystackCheckout;
+/** ============================================================================
+ *  CALLABLE: cancelPaystackSubscription
+ * ==========================================================================*/
+exports.cancelPaystackSubscription = functions.https.onCall(async (data, context) => {
+    assertOwnerAccess(context);
+    const paystackConfig = ensurePaystackConfig();
+    const uid = context.auth.uid;
+    const payload = (data ?? {});
+    const requestedStoreId = typeof payload.storeId === 'string' ? payload.storeId.trim() : '';
+    const memberRef = firestore_1.defaultDb.collection('teamMembers').doc(uid);
+    const memberSnap = await memberRef.get();
+    const memberData = (memberSnap.data() ?? {});
+    let resolvedStoreId = '';
+    if (requestedStoreId) {
+        resolvedStoreId = requestedStoreId;
+    }
+    else if (typeof memberData.storeId === 'string' && memberData.storeId.trim() !== '') {
+        resolvedStoreId = memberData.storeId;
+    }
+    else {
+        resolvedStoreId = uid;
+    }
+    const storeId = resolvedStoreId;
+    await verifyOwnerForStore(uid, storeId);
+    const storeRef = firestore_1.defaultDb.collection('stores').doc(storeId);
+    const storeSnap = await storeRef.get();
+    if (!storeSnap.exists) {
+        throw new functions.https.HttpsError('not-found', 'Store not found.');
+    }
+    const storeData = (storeSnap.data() ?? {});
+    const billing = (storeData.billing ?? {});
+    const subscriptionCode = typeof billing.paystackSubscriptionCode === 'string'
+        ? billing.paystackSubscriptionCode
+        : null;
+    if (!subscriptionCode) {
+        throw new functions.https.HttpsError('failed-precondition', 'No Paystack subscription was found for this workspace.');
+    }
+    let emailToken = typeof billing.paystackEmailToken === 'string' ? billing.paystackEmailToken : null;
+    if (!emailToken) {
+        try {
+            const fetchResponse = await fetch(`${PAYSTACK_BASE_URL}/subscription/${subscriptionCode}`, {
+                method: 'GET',
+                headers: {
+                    Authorization: `Bearer ${paystackConfig.secret}`,
+                    'Content-Type': 'application/json',
+                },
+            });
+            const fetchJson = await fetchResponse.json();
+            if (fetchResponse.ok && fetchJson?.status) {
+                const token = fetchJson?.data && typeof fetchJson.data.email_token === 'string'
+                    ? fetchJson.data.email_token
+                    : null;
+                if (token) {
+                    emailToken = token;
+                }
+            }
+            else {
+                console.warn('[paystack] unable to fetch subscription token', fetchJson);
+            }
+        }
+        catch (error) {
+            console.error('[paystack] failed to fetch subscription token', error);
+        }
+    }
+    if (!emailToken) {
+        throw new functions.https.HttpsError('failed-precondition', 'Unable to locate the Paystack subscription token for cancellation.');
+    }
+    let responseJson;
+    try {
+        const response = await fetch(`${PAYSTACK_BASE_URL}/subscription/disable`, {
+            method: 'POST',
+            headers: {
+                Authorization: `Bearer ${paystackConfig.secret}`,
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ code: subscriptionCode, token: emailToken }),
+        });
+        responseJson = await response.json();
+        if (!response.ok || !responseJson.status) {
+            console.error('[paystack] disable failed', responseJson);
+            throw new functions.https.HttpsError('unknown', 'Unable to cancel the Paystack subscription.');
+        }
+    }
+    catch (error) {
+        console.error('[paystack] disable error', error);
+        throw new functions.https.HttpsError('unknown', 'Unable to cancel the Paystack subscription.');
+    }
+    const timestamp = firestore_1.admin.firestore.FieldValue.serverTimestamp();
+    await storeRef.set({
+        billing: {
+            ...(billing || {}),
+            status: 'inactive',
+            paystackSubscriptionCode: subscriptionCode,
+            paystackEmailToken: emailToken,
+            canceledAt: timestamp,
+            canceledBy: uid,
+            lastEventAt: timestamp,
+        },
+        paymentStatus: 'inactive',
+        contractStatus: 'canceled',
+        updatedAt: timestamp,
+    }, { merge: true });
+    await firestore_1.defaultDb.collection('subscriptions').doc(storeId).set({
+        provider: 'paystack',
+        status: 'canceled',
+        canceledAt: timestamp,
+        canceledBy: uid,
+        updatedAt: timestamp,
+    }, { merge: true });
+    return {
+        ok: true,
+        status: 'canceled',
+    };
+});
 /** ============================================================================
  *  CALLABLE: createBulkCreditsCheckout (bulk messaging credits)
  * ==========================================================================*/
@@ -1759,6 +1936,7 @@ exports.handlePaystackWebhook = functions.https.onRequest(async (req, res) => {
                     currency: paystackConfig.currency,
                     paystackCustomerCode: customer.customer_code || null,
                     paystackSubscriptionCode: subscription.subscription_code || null,
+                    paystackEmailToken: subscription.email_token || null,
                     paystackPlanCode: (plan && typeof plan.plan_code === 'string' && plan.plan_code) ||
                         resolvePaystackPlanCode(resolvePlanKey(metadata.planKey) ||
                             resolvePlanKey(metadata.plan) ||
@@ -1789,6 +1967,8 @@ exports.handlePaystackWebhook = functions.https.onRequest(async (req, res) => {
                 reference: data.reference || null,
                 amount: typeof data.amount === 'number' ? data.amount / 100 : null,
                 currency: paystackConfig.currency,
+                paystackSubscriptionCode: subscription.subscription_code || null,
+                paystackEmailToken: subscription.email_token || null,
                 currentPeriodStart: firestore_1.admin.firestore.Timestamp.fromDate(new Date(typeof data.paid_at === 'string' ? data.paid_at : Date.now())),
                 currentPeriodEnd: firestore_1.admin.firestore.Timestamp.fromDate(addMonths(new Date(typeof data.paid_at === 'string' ? data.paid_at : Date.now()), resolvePlanMonths(resolvePlanKey(metadata.planKey) ||
                     resolvePlanKey(metadata.plan) ||

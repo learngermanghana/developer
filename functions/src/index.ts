@@ -1671,7 +1671,7 @@ export const sendBulkMessage = functions.https.onCall(
   async (data: unknown, context: functions.https.CallableContext) => {
     assertOwnerAccess(context)
 
-    const { storeId, message, recipients } = normalizeBulkMessagePayload(data as BulkMessagePayload)
+    const { storeId, channel, message, recipients } = normalizeBulkMessagePayload(data as BulkMessagePayload)
 
     await verifyOwnerForStore(context.auth!.uid, storeId)
 
@@ -1783,6 +1783,33 @@ export const sendBulkMessage = functions.https.onCall(
         bulkMessagingCredits: admin.firestore.FieldValue.increment(refundCredits),
         updatedAt: admin.firestore.FieldValue.serverTimestamp(),
       })
+    }
+
+    const deliveryStatus =
+      sent === attempted ? 'all_sent' : sent === 0 ? 'all_failed' : 'partial_failure'
+
+    try {
+      await storeRef.collection('bulkMessageRuns').add({
+        storeId,
+        ownerUid: context.auth?.uid ?? null,
+        channel,
+        message,
+        attempted,
+        sent,
+        failed: failures.length,
+        deliveryStatus,
+        creditsDebited: creditsRequired,
+        creditsRefunded: refundCredits,
+        recipients: recipients.map(recipient => ({
+          id: recipient.id ?? null,
+          name: recipient.name ?? null,
+          phone: recipient.phone ?? null,
+        })),
+        failures: failures.map(({ phone, error }) => ({ phone, error })),
+        createdAt: admin.firestore.FieldValue.serverTimestamp(),
+      })
+    } catch (logError) {
+      console.error('[bulk-messaging] Failed to write bulk message run log', logError)
     }
 
     return {
