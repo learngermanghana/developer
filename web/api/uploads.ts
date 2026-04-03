@@ -65,14 +65,19 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const basename = safeFilename.replace(/\.[^.]+$/, '')
     const objectName = `product-images/${Date.now()}-${basename}${ext}`
 
-    const adminApp = getAdmin()
     console.log('[api/uploads] bucket env check', {
       hasImageUploadBucket: !!process.env.IMAGE_UPLOAD_BUCKET,
       hasFirebaseStorageBucket: !!process.env.FIREBASE_STORAGE_BUCKET,
       imageUploadBucketName: process.env.IMAGE_UPLOAD_BUCKET || null,
       firebaseStorageBucketName: process.env.FIREBASE_STORAGE_BUCKET || null,
+      firebaseProjectId: process.env.FIREBASE_PROJECT_ID || null,
     })
-    const configuredBucket = process.env.IMAGE_UPLOAD_BUCKET || process.env.FIREBASE_STORAGE_BUCKET
+
+    const adminApp = getAdmin()
+
+    const configuredBucket =
+      process.env.IMAGE_UPLOAD_BUCKET || process.env.FIREBASE_STORAGE_BUCKET
+
     if (!configuredBucket || typeof configuredBucket !== 'string') {
       return res.status(500).json({
         error: 'IMAGE_UPLOAD_BUCKET is not configured for image uploads.',
@@ -81,6 +86,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     const bucket = adminApp.storage().bucket(configuredBucket)
     const file = bucket.file(objectName)
+
     await file.save(fileBuffer, {
       contentType: mimeType,
       resumable: false,
@@ -88,23 +94,42 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         cacheControl: 'public,max-age=31536000,immutable',
       },
     })
+
     try {
       await file.makePublic()
       const publicUrl = `https://storage.googleapis.com/${bucket.name}/${encodeURI(objectName)}`
       return res.status(201).json({ url: publicUrl })
     } catch (makePublicError) {
-      console.warn('[api/uploads] makePublic failed, returning signed URL instead', makePublicError)
+      console.warn(
+        '[api/uploads] makePublic failed, returning signed URL instead',
+        makePublicError,
+      )
+
       const [signedUrl] = await file.getSignedUrl({
         action: 'read',
         expires: SIGNED_URL_EXPIRATION,
       })
+
       return res.status(201).json({ url: signedUrl })
     }
   } catch (error) {
+    const message = error instanceof Error ? error.message : String(error)
+
     console.error('[api/uploads] upload failed', {
-      message: error instanceof Error ? error.message : String(error),
+      message,
       stack: error instanceof Error ? error.stack : null,
+      hasImageUploadBucket: !!process.env.IMAGE_UPLOAD_BUCKET,
+      hasFirebaseStorageBucket: !!process.env.FIREBASE_STORAGE_BUCKET,
+      imageUploadBucketName: process.env.IMAGE_UPLOAD_BUCKET || null,
+      firebaseStorageBucketName: process.env.FIREBASE_STORAGE_BUCKET || null,
+      hasAdminServiceAccountJson: !!process.env.ADMIN_SERVICE_ACCOUNT_JSON,
+      hasFirebaseServiceAccountJson: !!process.env.FIREBASE_SERVICE_ACCOUNT_JSON,
+      hasFirebaseServiceAccountBase64: !!process.env.FIREBASE_SERVICE_ACCOUNT_BASE64,
+      firebaseProjectId: process.env.FIREBASE_PROJECT_ID || null,
     })
-    return res.status(500).json({ error: 'Failed to store image.' })
+
+    return res.status(500).json({
+      error: `Failed to store image: ${message}`,
+    })
   }
 }
