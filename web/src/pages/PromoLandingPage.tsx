@@ -119,17 +119,25 @@ export default function PromoLandingPage() {
     <main className="promo-page">
       <article className="promo-card">
         <p className="promo-label">Sedifex promo</p>
-        <h1>{profile.title || `${profile.storeName} Promotion`}</h1>
+        <h1>{profile.title || `Special offers at ${profile.storeName}`}</h1>
         <p className="promo-store">Store: {profile.storeName}</p>
-        <p>{profile.summary || 'Check out this offer from our store.'}</p>
+        <p className="promo-summary">
+          {profile.summary ||
+            `Discover limited-time beauty and wellness deals from ${profile.storeName}. Book now and enjoy premium care for less.`}
+        </p>
         {(profile.startDate || profile.endDate) && (
           <p className="promo-dates">
-            {profile.startDate || 'Now'} – {profile.endDate || 'Limited time'}
+            Offer window: {profile.startDate || 'Now'} – {profile.endDate || 'Limited time'}
           </p>
         )}
         {profile.websiteUrl ? (
-          <a href={profile.websiteUrl} target="_blank" rel="noreferrer noopener">
-            Visit store website
+          <a
+            className="promo-cta"
+            href={profile.websiteUrl}
+            target="_blank"
+            rel="noreferrer noopener"
+          >
+            Claim this offer
           </a>
         ) : null}
       </article>
