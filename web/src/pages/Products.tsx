@@ -12,7 +12,6 @@ import {
   updateDoc,
   where,
 } from 'firebase/firestore'
-import { Link } from 'react-router-dom'
 import './Products.css'
 import { db } from '../firebase'
 import { useActiveStore } from '../hooks/useActiveStore'
@@ -921,11 +920,6 @@ export default function Products() {
             Review inventory, monitor low stock alerts, and keep your catalogue of items
             and services tidy.
           </p>
-        </div>
-        <div className="products-page__header-actions">
-          <Link to="/receive" className="button button--primary">
-            Receive stock
-          </Link>
         </div>
       </header>
 
