@@ -23,6 +23,28 @@ function normalizeSlug(value: string): string {
     .replace(/^-|-$/g, '')
 }
 
+function sanitizeSummary(value: string | null, storeName: string): string {
+  if (!value) {
+    return `Discover limited-time beauty and wellness deals from ${storeName}. Book now and enjoy premium care for less.`
+  }
+
+  const compact = value.replace(/\s+/g, ' ').trim()
+  if (compact.length < 16) {
+    return `Exclusive offer from ${storeName}. Secure your slot now and save on your next treatment.`
+  }
+
+  return compact
+}
+
+function formatPromoDate(value: string | null): string | null {
+  if (!value) return null
+  const parsed = new Date(value)
+  if (Number.isNaN(parsed.getTime())) return value
+  return new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric', year: 'numeric' }).format(
+    parsed,
+  )
+}
+
 export default function PromoLandingPage() {
   const { slug = '' } = useParams()
   const [profile, setProfile] = useState<PromoProfile | null>(null)
@@ -95,7 +117,7 @@ export default function PromoLandingPage() {
     return (
       <main className="promo-page">
         <article className="promo-card">
-          <p>Loading promo…</p>
+          <p className="promo-state">Loading promo…</p>
         </article>
       </main>
     )
@@ -105,8 +127,8 @@ export default function PromoLandingPage() {
     return (
       <main className="promo-page">
         <article className="promo-card">
-          <h1>Promo unavailable</h1>
-          <p>{error ?? 'This promo link is not active.'}</p>
+          <h1 className="promo-error-title">Promo unavailable</h1>
+          <p className="promo-state">{error ?? 'This promo link is not active.'}</p>
           <p>
             <Link to="/">Go to Sedifex home</Link>
           </p>
@@ -115,23 +137,46 @@ export default function PromoLandingPage() {
     )
   }
 
+  const promoTitle = profile.title?.trim() || `Special offers at ${profile.storeName}`
+  const promoSummary = sanitizeSummary(profile.summary, profile.storeName)
+  const start = formatPromoDate(profile.startDate) || 'Now'
+  const end = formatPromoDate(profile.endDate) || 'Limited time'
+
   return (
     <main className="promo-page">
       <article className="promo-card">
         <p className="promo-label">Sedifex promo</p>
-        <h1>{profile.title || `${profile.storeName} Promotion`}</h1>
-        <p className="promo-store">Store: {profile.storeName}</p>
-        <p>{profile.summary || 'Check out this offer from our store.'}</p>
+        <h1>{promoTitle}</h1>
+        <p className="promo-summary">{promoSummary}</p>
+        <p className="promo-meta">By {profile.storeName}</p>
+        <div className="promo-trust-chips" aria-label="Promo highlights">
+          <span className="promo-chip">Trusted local provider</span>
+          <span className="promo-chip">Limited slots this week</span>
+          <span className="promo-chip">Fast booking</span>
+        </div>
         {(profile.startDate || profile.endDate) && (
-          <p className="promo-dates">
-            {profile.startDate || 'Now'} – {profile.endDate || 'Limited time'}
-          </p>
+          <p className="promo-dates">Offer window: {start} – {end}</p>
         )}
         {profile.websiteUrl ? (
-          <a href={profile.websiteUrl} target="_blank" rel="noreferrer noopener">
-            Visit store website
-          </a>
-        ) : null}
+          <div className="promo-actions">
+            <a
+              className="promo-cta"
+              href={profile.websiteUrl}
+              target="_blank"
+              rel="noreferrer noopener"
+            >
+              Claim this offer
+            </a>
+            <p className="promo-cta-note">Takes 30 seconds • No code needed</p>
+          </div>
+        ) : (
+          <div className="promo-actions">
+            <Link className="promo-cta promo-cta-fallback" to="/">
+              Contact store on Sedifex
+            </Link>
+            <p className="promo-cta-note">No website listed yet — we can still connect you quickly.</p>
+          </div>
+        )}
       </article>
     </main>
   )
