@@ -1,6 +1,14 @@
-import * as admin from 'firebase-admin'
+import type { App } from 'firebase-admin/app'
+import { cert, getApp, getApps, initializeApp } from 'firebase-admin/app'
+import { getFirestore } from 'firebase-admin/firestore'
 
-let app: admin.app.App | undefined
+let app: App | undefined
+
+type ParsedServiceAccount = {
+  projectId: string
+  clientEmail: string
+  privateKey: string
+}
 
 type RawServiceAccount = {
   project_id?: unknown
@@ -11,7 +19,7 @@ type RawServiceAccount = {
   privateKey?: unknown
 }
 
-function parseServiceAccount(raw: string): admin.ServiceAccount {
+function parseServiceAccount(raw: string): ParsedServiceAccount {
   let parsed: RawServiceAccount
 
   try {
@@ -70,7 +78,7 @@ function parseServiceAccount(raw: string): admin.ServiceAccount {
   }
 }
 
-function loadServiceAccount(): admin.ServiceAccount {
+function loadServiceAccount(): ParsedServiceAccount {
   console.log('[api/_firebase-admin] service account env check', {
     hasAdminJson: !!process.env.ADMIN_SERVICE_ACCOUNT_JSON,
     hasAdminBase64: !!process.env.ADMIN_SERVICE_ACCOUNT_BASE64,
@@ -100,19 +108,19 @@ function loadServiceAccount(): admin.ServiceAccount {
   )
 }
 
-export function getAdmin(): admin.app.App {
+export function getAdmin(): App {
   if (app) return app
 
   const creds = loadServiceAccount()
 
-  app = admin.apps.length
-    ? admin.app()
-    : admin.initializeApp({
-        credential: admin.credential.cert(creds),
+  app = getApps().length
+    ? getApp()
+    : initializeApp({
+        credential: cert(creds),
         projectId: creds.projectId,
       })
 
   return app
 }
 
-export const db = () => getAdmin().firestore()
+export const db = () => getFirestore(getAdmin())
