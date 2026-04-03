@@ -27,6 +27,7 @@ import { normalizeBarcode } from '../utils/barcode'
 import { useStorePreferences } from '../hooks/useStorePreferences'
 import type { ItemType, Product } from '../types/product'
 import { ProductImageUploadError, uploadProductImage } from '../api/productImageUpload'
+import { useToast } from '../components/ToastProvider'
 
 type CachedProduct = Omit<Product, 'id'>
 type AbcBucket = 'A' | 'B' | 'C'
@@ -111,12 +112,7 @@ function mapFirestoreProduct(id: string, data: Record<string, unknown>): Product
 
   const normalizedBarcode = normalizeBarcode(barcodeSource)
 
-  const itemType =
-    data.itemType === 'service'
-      ? 'service'
-      : data.itemType === 'made_to_order'
-        ? 'made_to_order'
-        : 'product'
+  const itemType = data.itemType === 'service' ? 'service' : 'product'
 
   const expiryDate = toDate(data.expiryDate)
   const productionDate = toDate(data.productionDate)
@@ -258,6 +254,7 @@ export default function Products() {
   const { memberships } = useMemberships()
   const user = useAuthUser()
   const { preferences } = useStorePreferences(activeStoreId)
+  const { publish } = useToast()
 
   const [products, setProducts] = useState<Product[]>([])
   const [sales, setSales] = useState<SaleRecord[]>([])
@@ -308,7 +305,7 @@ export default function Products() {
 
   useEffect(() => {
     if (editingId) return
-    setItemType(preferences.productDefaults.defaultItemType)
+    setItemType(preferences.productDefaults.defaultItemType === 'service' ? 'service' : 'product')
   }, [editingId, preferences.productDefaults.defaultItemType])
 
   const activeMembership = useMemo(
@@ -444,7 +441,7 @@ export default function Products() {
       for (const item of sale.items) {
         if (!item.productId) continue
         const itemType = typeof item.type === 'string' ? item.type.toLowerCase() : null
-        if (item.isService || itemType === 'service' || itemType === 'made_to_order') {
+        if (item.isService || itemType === 'service') {
           continue
         }
         const revenue = item.qty * item.price
@@ -667,6 +664,7 @@ export default function Products() {
       const uploadedUrl = await uploadProductImage(imageFileInput)
       setImageUrlInput(uploadedUrl)
       setImageFileInput(null)
+      publish({ tone: 'success', message: 'Image uploaded successfully.' })
     } catch (error) {
       console.error('[products] Failed to upload product image', error)
       if (error instanceof ProductImageUploadError) {
@@ -1004,17 +1002,12 @@ export default function Products() {
               </label>
               <select id="add-type" value={itemType} onChange={handleItemTypeChange}>
                 <option value="product">Physical product</option>
-                <option value="made_to_order">Made-to-order (no stock counts)</option>
                 <option value="service">Service</option>
               </select>
               <div>
                 <p className="field__hint">
                   <strong>Physical product:</strong> Tracks on-hand stock for items you store so you
                   can watch low-stock alerts.
-                </p>
-                <p className="field__hint">
-                  <strong>Made-to-order:</strong> For cooked or prepared-to-order items. Sales are
-                  recorded without deducting shelf stock, and you can still add production details.
                 </p>
                 <p className="field__hint">
                   <strong>Service:</strong> No stock counts—best for labour or time-based work while
@@ -1396,11 +1389,7 @@ export default function Products() {
                       <div className="products-page__list-title">
                         <h4>{product.name}</h4>
                         <span className="products-page__badge products-page__badge--muted">
-                          {displayItemType === 'service'
-                            ? 'Service'
-                            : displayItemType === 'made_to_order'
-                              ? 'Made-to-order'
-                              : 'Product'}
+                          {displayItemType === 'service' ? 'Service' : 'Product'}
                         </span>
                         {isStockTracked && typeof product.reorderPoint === 'number' &&
                           typeof product.stockCount === 'number' &&
@@ -1446,15 +1435,10 @@ export default function Products() {
                           >
                             <option value="product">Physical product</option>
                             <option value="service">Service</option>
-                            <option value="made_to_order">Made-to-order</option>
                           </select>
                         ) : (
                           <p className="products-page__list-value">
-                            {product.itemType === 'service'
-                              ? 'Service'
-                              : product.itemType === 'made_to_order'
-                                ? 'Made-to-order'
-                                : 'Physical product'}
+                            {product.itemType === 'service' ? 'Service' : 'Physical product'}
                           </p>
                         )}
                       </div>
