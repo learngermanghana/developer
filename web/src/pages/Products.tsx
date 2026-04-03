@@ -30,6 +30,7 @@ import { uploadProductImage } from '../api/productImageUpload'
 
 type CachedProduct = Omit<Product, 'id'>
 type AbcBucket = 'A' | 'B' | 'C'
+type ProductTab = 'add' | 'search'
 type SaleRecord = {
   id: string
   items: Array<{
@@ -260,6 +261,7 @@ export default function Products() {
 
   const [products, setProducts] = useState<Product[]>([])
   const [sales, setSales] = useState<SaleRecord[]>([])
+  const [activeTab, setActiveTab] = useState<ProductTab>('add')
   const [searchText, setSearchText] = useState('')
   const [showLowStockOnly, setShowLowStockOnly] = useState(false)
   const [expandedProductIds, setExpandedProductIds] = useState<Set<string>>(new Set())
@@ -714,6 +716,7 @@ export default function Products() {
   function startEditing(product: Product) {
     if (!canManageProducts) return
 
+    setActiveTab('search')
     setExpandedProductIds(prev => new Set(prev).add(product.id))
     setEditingId(product.id)
     setEditName(product.name)
@@ -923,8 +926,39 @@ export default function Products() {
       </header>
 
       <div className="products-page__grid">
+        <div className="products-page__tabs" role="tablist" aria-label="Items sub-tabs">
+          <button
+            type="button"
+            role="tab"
+            id="products-tab-add"
+            aria-controls="products-panel-add"
+            aria-selected={activeTab === 'add'}
+            className={`products-page__tab ${activeTab === 'add' ? 'is-active' : ''}`}
+            onClick={() => setActiveTab('add')}
+          >
+            Add product
+          </button>
+          <button
+            type="button"
+            role="tab"
+            id="products-tab-search"
+            aria-controls="products-panel-search"
+            aria-selected={activeTab === 'search'}
+            className={`products-page__tab ${activeTab === 'search' ? 'is-active' : ''}`}
+            onClick={() => setActiveTab('search')}
+          >
+            Search products
+          </button>
+        </div>
+
         {/* Add item card */}
-        <section className="card products-page__add-card">
+        <section
+          className={`card products-page__add-card ${activeTab !== 'add' ? 'products-page__panel--hidden' : ''}`}
+          role="tabpanel"
+          id="products-panel-add"
+          aria-labelledby="products-tab-add"
+          hidden={activeTab !== 'add'}
+        >
           <h3 className="card__title">Add item</h3>
           <p className="card__subtitle">
             Capture both physical products and services you offer so sales and records
@@ -1214,7 +1248,13 @@ export default function Products() {
         </section>
 
         {/* List card */}
-        <section className="card products-page__list-card">
+        <section
+          className={`card products-page__list-card ${activeTab !== 'search' ? 'products-page__panel--hidden' : ''}`}
+          role="tabpanel"
+          id="products-panel-search"
+          aria-labelledby="products-tab-search"
+          hidden={activeTab !== 'search'}
+        >
           <div className="products-page__list-header">
             <div className="field field--inline">
               <label className="field__label" htmlFor="products-search">
