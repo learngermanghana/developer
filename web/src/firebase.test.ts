@@ -43,4 +43,25 @@ describe('firebase configuration', () => {
     expect(firebase.db).toBeDefined()
     expect(firebase).not.toHaveProperty('rosterDb')
   })
+
+
+  it('supports non-Vite Firebase env aliases for hosted deployments', async () => {
+    vi.unstubAllEnvs()
+    vi.stubEnv('NEXT_PUBLIC_FB_API_KEY', 'alias-api-key')
+    vi.stubEnv('NEXT_PUBLIC_FB_AUTH_DOMAIN', 'alias-auth.example.com')
+    vi.stubEnv('NEXT_PUBLIC_FB_PROJECT_ID', 'alias-project-123')
+    vi.stubEnv('NEXT_PUBLIC_FB_STORAGE_BUCKET', 'alias-bucket-123')
+    vi.stubEnv('NEXT_PUBLIC_FB_APP_ID', 'alias-app-123')
+    vi.stubEnv('NEXT_PUBLIC_FB_FUNCTIONS_REGION', 'alias-region-1')
+
+    const firebase = await import('./firebase')
+
+    expect(firebase.firebaseConfig).toEqual({
+      apiKey: 'alias-api-key',
+      authDomain: 'alias-auth.example.com',
+      projectId: 'alias-project-123',
+      storageBucket: 'alias-bucket-123',
+      appId: 'alias-app-123',
+    })
+  })
 })
