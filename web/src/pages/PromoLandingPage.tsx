@@ -146,37 +146,27 @@ export default function PromoLandingPage() {
     <main className="promo-page">
       <article className="promo-card">
         <p className="promo-label">Sedifex promo</p>
-        <h1>{promoTitle}</h1>
-        <p className="promo-summary">{promoSummary}</p>
-        <p className="promo-meta">By {profile.storeName}</p>
-        <div className="promo-trust-chips" aria-label="Promo highlights">
-          <span className="promo-chip">Trusted local provider</span>
-          <span className="promo-chip">Limited slots this week</span>
-          <span className="promo-chip">Fast booking</span>
-        </div>
+        <h1>{profile.title || `Special offers at ${profile.storeName}`}</h1>
+        <p className="promo-store">Store: {profile.storeName}</p>
+        <p className="promo-summary">
+          {profile.summary ||
+            `Discover limited-time beauty and wellness deals from ${profile.storeName}. Book now and enjoy premium care for less.`}
+        </p>
         {(profile.startDate || profile.endDate) && (
-          <p className="promo-dates">Offer window: {start} – {end}</p>
+          <p className="promo-dates">
+            Offer window: {profile.startDate || 'Now'} – {profile.endDate || 'Limited time'}
+          </p>
         )}
         {profile.websiteUrl ? (
-          <div className="promo-actions">
-            <a
-              className="promo-cta"
-              href={profile.websiteUrl}
-              target="_blank"
-              rel="noreferrer noopener"
-            >
-              Claim this offer
-            </a>
-            <p className="promo-cta-note">Takes 30 seconds • No code needed</p>
-          </div>
-        ) : (
-          <div className="promo-actions">
-            <Link className="promo-cta promo-cta-fallback" to="/">
-              Contact store on Sedifex
-            </Link>
-            <p className="promo-cta-note">No website listed yet — we can still connect you quickly.</p>
-          </div>
-        )}
+          <a
+            className="promo-cta"
+            href={profile.websiteUrl}
+            target="_blank"
+            rel="noreferrer noopener"
+          >
+            Claim this offer
+          </a>
+        ) : null}
       </article>
     </main>
   )
