@@ -1,8 +1,8 @@
-import type { ServiceAccount, app as AdminApp } from 'firebase-admin'
-import { cert, getApp, getApps, initializeApp } from 'firebase-admin/app'
+import type { ServiceAccount } from 'firebase-admin/app'
+import { cert, getApp, getApps, initializeApp, App } from 'firebase-admin/app'
 import { getFirestore } from 'firebase-admin/firestore'
 
-let app: AdminApp.App | undefined
+let app: App | undefined
 
 type RawServiceAccount = {
   project_id?: unknown
@@ -102,7 +102,7 @@ function loadServiceAccount(): ServiceAccount {
   )
 }
 
-export function getAdmin(): AdminApp.App {
+export function getAdmin(): App {
   if (app) return app
 
   const creds = loadServiceAccount()
