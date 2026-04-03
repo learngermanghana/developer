@@ -379,7 +379,7 @@ export default function BulkMessaging() {
     if (creditLoading) {
       setStatus({
         tone: 'info',
-        message: 'Checking bulk messaging credits. Please wait a moment and try again.',
+        message: 'Checking SMS credits. Please wait a moment and try again.',
       })
       return
     }
@@ -387,7 +387,7 @@ export default function BulkMessaging() {
     if (!hasEnoughCredits) {
       setStatus({
         tone: 'error',
-        message: 'You are out of bulk messaging credits. Please buy more to continue.',
+        message: 'You are out of SMS credits. Please buy more to continue.',
       })
       return
     }
@@ -439,7 +439,7 @@ export default function BulkMessaging() {
       if (error instanceof FirebaseError && error.code === 'failed-precondition') {
         setStatus({
           tone: 'error',
-          message: error.message || 'You do not have enough bulk messaging credits to send.',
+          message: error.message || 'You do not have enough SMS credits to send.',
         })
         return
       }
@@ -503,7 +503,7 @@ export default function BulkMessaging() {
         </div>
       </header>
 
-      <div className="bulk-messaging-page__tabs" role="tablist" aria-label="Bulk messaging sections">
+      <div className="bulk-messaging-page__tabs" role="tablist" aria-label="SMS sections">
         <button
           type="button"
           role="tab"
@@ -561,7 +561,7 @@ export default function BulkMessaging() {
             <p className="bulk-messaging-page__summary-meta">{`${messageSegments} SMS segment(s)`}</p>
           </div>
           <div className="card bulk-messaging-page__summary-card bulk-messaging-page__summary-card--credits">
-            <p className="bulk-messaging-page__summary-label">Bulk message credits</p>
+            <p className="bulk-messaging-page__summary-label">SMS credits</p>
             <p className="bulk-messaging-page__summary-value">
               {creditLoading ? 'Loading…' : creditBalance}
             </p>
@@ -646,7 +646,7 @@ export default function BulkMessaging() {
               <div className="bulk-messaging-page__actions-meta">
                 {hasEnoughCredits
                   ? 'Only customers with phone numbers will receive this broadcast.'
-                  : 'Purchase bulk messaging credits to unlock sending.'}
+                  : 'Purchase SMS credits to unlock sending.'}
               </div>
             </div>
           </form>
@@ -737,7 +737,7 @@ export default function BulkMessaging() {
       {activeTab === 'buy' ? (
         <section className="card bulk-messaging-page__buy-credits" id="buy-credits" role="tabpanel">
         <div>
-          <h3 className="card__title">Buy bulk messaging credits</h3>
+          <h3 className="card__title">Buy SMS credits</h3>
           <p className="card__subtitle">
             Top up your balance to keep broadcasting SMS campaigns.
           </p>
