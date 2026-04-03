@@ -74,7 +74,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     })
 
     const adminApp = getAdmin()
-
     const configuredBucket =
       process.env.IMAGE_UPLOAD_BUCKET || process.env.FIREBASE_STORAGE_BUCKET
 
@@ -88,9 +87,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const file = bucket.file(objectName)
 
     await file.save(fileBuffer, {
-      contentType: mimeType,
       resumable: false,
       metadata: {
+        contentType: mimeType, // moved inside metadata
         cacheControl: 'public,max-age=31536000,immutable',
       },
     })
