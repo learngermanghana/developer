@@ -61,8 +61,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   try {
     const safeFilename = normalizeFilename(filename)
+    const basename = safeFilename.replace(/\.(jpe?g|png|webp|gif|avif|svg)$/i, '')
     const ext = resolveExtension(safeFilename, mimeType)
-    const basename = safeFilename.replace(/\.[^.]+$/, '')
     const objectName = `product-images/${Date.now()}-${basename}${ext}`
 
     console.log('[api/uploads] bucket env check', {
