@@ -101,19 +101,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return res.status(201).json({ url: signedUrl })
     }
   } catch (error) {
-    const message = error instanceof Error ? error.message : String(error)
-
     console.error('[api/uploads] upload failed', {
-      message,
+      message: error instanceof Error ? error.message : String(error),
       stack: error instanceof Error ? error.stack : null,
-      hasFirebaseServiceAccountJson: !!process.env.FIREBASE_SERVICE_ACCOUNT_JSON,
-      hasFirebaseServiceAccountBase64: !!process.env.FIREBASE_SERVICE_ACCOUNT_BASE64,
-      firebaseStorageBucket: process.env.FIREBASE_STORAGE_BUCKET ?? null,
-      firebaseProjectId: process.env.FIREBASE_PROJECT_ID ?? null,
     })
-
-    return res.status(500).json({
-      error: `Failed to store image: ${message}`,
-    })
+    return res.status(500).json({ error: 'Failed to store image.' })
   }
 }
