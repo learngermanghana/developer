@@ -41,6 +41,7 @@ import {
   QRCodeDecoderErrorCorrectionLevel,
 } from '@zxing/library'
 import { useKeyboardScanner } from '../components/BarcodeScanner'
+import { useToast } from '../components/ToastProvider'
 
 import { type EscPosReceiptSize } from '../utils/escpos'
 import { PaymentMethod, buildReceiptPdf, type ReceiptLine, type ReceiptPayload, type ReceiptTender } from '../utils/receipt'
@@ -272,6 +273,7 @@ async function downloadOrSharePdf(fileName: string, blobUrl: string, shareText?:
 export default function Sell() {
   const { storeId: activeStoreId } = useActiveStore()
   const user = useAuthUser()
+  const { publish } = useToast()
   const [searchParams] = useSearchParams()
 
   const [storeName, setStoreName] = useState<string | null>(null)
@@ -1124,8 +1126,30 @@ export default function Sell() {
     })
 
     void playSound('action')
+    publish({ tone: 'success', message: `Added ${product.name} to cart.` })
 
     return { ok: true, needsPrice: !hasValidPrice && canSetPriceAtCheckout }
+  }
+
+  async function notifySaleCompleted(total: number) {
+    if (typeof window === 'undefined' || !('Notification' in window)) return
+    if (Notification.permission === 'granted') {
+      new Notification('Sale recorded', {
+        body: `Total ${formatCurrency(total)}. Ready for the next customer.`,
+      })
+      return
+    }
+    if (Notification.permission !== 'default') return
+    try {
+      const permission = await Notification.requestPermission()
+      if (permission === 'granted') {
+        new Notification('Sale recorded', {
+          body: `Total ${formatCurrency(total)}. Ready for the next customer.`,
+        })
+      }
+    } catch {
+      // Ignore notification permission errors.
+    }
   }
 
   function updateCartQty(productId: string, qty: number) {
@@ -1491,8 +1515,11 @@ export default function Sell() {
       setCustomerNameInput('')
       setCustomerPhoneInput('')
       setSelectedCustomerId(null)
+      setSellFlowTab('items')
       setSuccessMessage('Sale recorded successfully.')
       void playSound('success')
+      publish({ tone: 'success', message: 'Sale recorded successfully.' })
+      void notifySaleCompleted(totalAfterDiscount)
     } catch (error: any) {
       console.error('[sell] Failed to commit sale', error)
       if (isOfflineError(error)) {
@@ -1526,8 +1553,11 @@ export default function Sell() {
           setCustomerNameInput('')
           setCustomerPhoneInput('')
           setSelectedCustomerId(null)
+          setSellFlowTab('items')
           setSuccessMessage('Offline — sale saved and will sync when you reconnect.')
           void playSound('success')
+          publish({ tone: 'success', message: 'Offline sale saved. It will sync when you reconnect.' })
+          void notifySaleCompleted(totalAfterDiscount)
           return
         }
       }
@@ -2022,6 +2052,13 @@ export default function Sell() {
 
           {errorMessage && <p className="sell-page__message sell-page__message--error">{errorMessage}</p>}
           {successMessage && <p className="sell-page__message sell-page__message--success">{successMessage}</p>}
+          {successMessage && (
+            <div className="sell-page__actions" style={{ marginTop: 12 }}>
+              <button type="button" className="button button--ghost" onClick={() => window.location.reload()}>
+                Refresh page
+              </button>
+            </div>
+          )}
 
           {receiptDownload && lastReceipt && (
             <details className="sell-page__scan-options" style={{ marginTop: 20 }} role="status">
