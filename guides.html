@@ -39,6 +39,20 @@
         <li><strong>Nightly sync + webhooks:</strong> full sync then event deltas.</li>
         <li><strong>Store isolation:</strong> enforce store-level scoping everywhere.</li>
       </ul>
+
+      <h2>Operational checklist rollout (monitoring + alerts)</h2>
+      <ol start="3">
+        <li>
+          <strong>Operational visibility turned on:</strong> sync success/failure logging,
+          repeated-failure alerting, and rollback controls are now represented in console
+          dashboards.
+        </li>
+        <li>
+          <strong>Webhook readiness (MVP):</strong> signed deliveries via
+          <code>X-Sedifex-Signature</code>, event ID idempotency guidance, and retry telemetry are
+          available for partner integrations.
+        </li>
+      </ol>
     </main>
   </body>
 </html>

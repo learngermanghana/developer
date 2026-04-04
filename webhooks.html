@@ -40,6 +40,29 @@
         <li><code>X-Sedifex-Delivery-Id</code> (unique delivery id)</li>
       </ul>
 
+      <h2>Webhook delivery payload contract (MVP)</h2>
+      <pre><code>{
+  "event": {
+    "id": "evt_01JQY7Q9K7N6M3P2P8V9XQ2T6H",
+    "type": "product.updated",
+    "createdAt": "2026-04-04T08:15:00Z"
+  },
+  "storeId": "store_123",
+  "data": {
+    "productId": "prod_1"
+  }
+}</code></pre>
+      <ul>
+        <li>
+          <strong>Idempotency:</strong> treat <code>event.id</code> as the de-duplication key
+          across retries.
+        </li>
+        <li>
+          <strong>Retry visibility:</strong> each delivery exposes attempt count, last response,
+          and next scheduled retry in the console.
+        </li>
+      </ul>
+
       <h2>Node.js verification example</h2>
       <pre><code>import crypto from "crypto";
 

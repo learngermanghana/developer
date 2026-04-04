@@ -74,6 +74,43 @@
           <li>Manage role permissions by workspace/store</li>
         </ul>
       </article>
+
+      <article class="card section-tight">
+        <h2>Operational visibility (implemented)</h2>
+        <ul>
+          <li>
+            <strong>Sync status logs:</strong> dashboard table for every product sync run with
+            started/finished timestamps, duration, rows changed, and explicit success/failure
+            state.
+          </li>
+          <li>
+            <strong>Repeated failure alerts:</strong> alert policy triggers when 3 consecutive
+            product syncs fail for the same store within 30 minutes and routes to on-call + Slack.
+          </li>
+          <li>
+            <strong>Rollback controls:</strong> one-click rollback to last successful product
+            snapshot and a "freeze live catalog updates" switch if current load quality degrades.
+          </li>
+        </ul>
+      </article>
+
+      <article class="card section-tight">
+        <h2>Webhook readiness (MVP)</h2>
+        <ul>
+          <li>
+            <strong>Signed events:</strong> every delivery includes
+            <code>X-Sedifex-Signature</code> using endpoint-secret HMAC SHA-256.
+          </li>
+          <li>
+            <strong>Idempotency:</strong> consumers can de-duplicate by stable
+            <code>event.id</code> and <code>X-Sedifex-Delivery-Id</code>.
+          </li>
+          <li>
+            <strong>Retry visibility:</strong> delivery timeline shows attempts, response codes,
+            next retry time, and terminal failure reason.
+          </li>
+        </ul>
+      </article>
     </main>
   </body>
 </html>
