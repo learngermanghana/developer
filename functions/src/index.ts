@@ -1705,6 +1705,19 @@ function shortMask(value: string) {
   return `${value.slice(0, 4)}••••${value.slice(-4)}`
 }
 
+function isFirestoreMissingIndexError(error: unknown) {
+  if (!error || typeof error !== 'object') return false
+
+  const code = 'code' in error ? (error as { code?: unknown }).code : undefined
+  const message = 'message' in error ? (error as { message?: unknown }).message : undefined
+
+  if (typeof code === 'number' && code === 9) return true
+  if (typeof code === 'string' && code.toLowerCase().includes('failed-precondition')) return true
+  if (typeof message === 'string' && message.toLowerCase().includes('index')) return true
+
+  return false
+}
+
 export const listIntegrationApiKeys = functions.https.onCall(
   async (_data: unknown, context: functions.https.CallableContext) => {
     try {
@@ -1713,29 +1726,47 @@ export const listIntegrationApiKeys = functions.https.onCall(
       const storeId = await resolveStaffStoreId(uid)
       await verifyOwnerForStore(uid, storeId)
 
-      const snapshot = await db
-        .collection('integrationApiKeys')
-        .where('storeId', '==', storeId)
-        .orderBy('createdAt', 'desc')
-        .limit(50)
-        .get()
+      let snapshot: admin.firestore.QuerySnapshot
+      try {
+        snapshot = await db
+          .collection('integrationApiKeys')
+          .where('storeId', '==', storeId)
+          .orderBy('createdAt', 'desc')
+          .limit(50)
+          .get()
+      } catch (queryError) {
+        if (!isFirestoreMissingIndexError(queryError)) throw queryError
 
-      const keys = snapshot.docs.map(docSnap => {
-        const data = docSnap.data() as Record<string, unknown>
-        return {
-          id: docSnap.id,
-          name: typeof data.name === 'string' ? data.name : 'Unnamed key',
-          status: data.status === 'revoked' ? 'revoked' : 'active',
-          keyPreview:
-            typeof data.keyPreview === 'string' && data.keyPreview.trim()
-              ? data.keyPreview
-              : '••••••••',
-          lastUsedAt: data.lastUsedAt instanceof admin.firestore.Timestamp ? data.lastUsedAt : null,
-          createdAt: data.createdAt instanceof admin.firestore.Timestamp ? data.createdAt : null,
-          updatedAt: data.updatedAt instanceof admin.firestore.Timestamp ? data.updatedAt : null,
-          revokedAt: data.revokedAt instanceof admin.firestore.Timestamp ? data.revokedAt : null,
-        }
-      })
+        console.warn(
+          '[integrations] listIntegrationApiKeys fallback to non-indexed query due to missing index',
+          queryError,
+        )
+        snapshot = await db.collection('integrationApiKeys').where('storeId', '==', storeId).limit(200).get()
+      }
+
+      const keys = snapshot.docs
+        .map(docSnap => {
+          const data = docSnap.data() as Record<string, unknown>
+          return {
+            id: docSnap.id,
+            name: typeof data.name === 'string' ? data.name : 'Unnamed key',
+            status: data.status === 'revoked' ? 'revoked' : 'active',
+            keyPreview:
+              typeof data.keyPreview === 'string' && data.keyPreview.trim()
+                ? data.keyPreview
+                : '••••••••',
+            lastUsedAt: data.lastUsedAt instanceof admin.firestore.Timestamp ? data.lastUsedAt : null,
+            createdAt: data.createdAt instanceof admin.firestore.Timestamp ? data.createdAt : null,
+            updatedAt: data.updatedAt instanceof admin.firestore.Timestamp ? data.updatedAt : null,
+            revokedAt: data.revokedAt instanceof admin.firestore.Timestamp ? data.revokedAt : null,
+          }
+        })
+        .sort((a, b) => {
+          const aMillis = a.createdAt?.toMillis() ?? 0
+          const bMillis = b.createdAt?.toMillis() ?? 0
+          return bMillis - aMillis
+        })
+        .slice(0, 50)
 
       return { storeId, keys }
     } catch (error) {
