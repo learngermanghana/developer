@@ -23,6 +23,47 @@ After setup, Website A can fetch and render:
 - `imageAlt`
 - `updatedAt`
 
+
+Customer data fields (for import/export template)
+
+Required
+
+    name — Primary customer name.
+
+Optional
+
+    display_name — Preferred display name.
+
+    phone — Phone number (country code recommended).
+
+    email — Customer email.
+
+    birthdate — Format: YYYY-MM-DD.
+
+    notes — Preferences or notes.
+
+    tags — Comma-separated labels/tags.
+
+Promo data fields (store promo profile)
+
+    promoTitle
+
+    promoSummary
+
+    promoStartDate
+
+    promoEndDate
+
+    promoSlug
+
+    promoWebsiteUrl
+
+Also used with:
+
+    displayName / name (store name fallback shown on promo page).
+
+The same promo field set is defined in the account/store profile typing too, so these are the right canonical keys to use
+
 ## Prerequisites
 
 1. Sedifex Firebase project configured (Firestore + Functions).
