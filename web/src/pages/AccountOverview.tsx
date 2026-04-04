@@ -251,7 +251,7 @@ type AccountOverviewProps = {
   headingLevel?: HeadingLevel
 }
 
-type AccountTab = 'workspace' | 'promotions' | 'operations'
+type AccountTab = 'workspace' | 'integrations' | 'promotions' | 'operations'
 
 export default function AccountOverview({ headingLevel = 'h1' }: AccountOverviewProps) {
   const { storeId, isLoading: storeLoading, error: storeError } = useActiveStore()
@@ -1086,6 +1086,14 @@ export default function AccountOverview({ headingLevel = 'h1' }: AccountOverview
         </button>
         <button
           type="button"
+          className={`account-overview__tab ${activeTab === 'integrations' ? 'is-active' : ''}`}
+          aria-pressed={activeTab === 'integrations'}
+          onClick={() => setActiveTab('integrations')}
+        >
+          Integrations
+        </button>
+        <button
+          type="button"
           className={`account-overview__tab ${activeTab === 'promotions' ? 'is-active' : ''}`}
           aria-pressed={activeTab === 'promotions'}
           onClick={() => setActiveTab('promotions')}
@@ -1164,124 +1172,6 @@ export default function AccountOverview({ headingLevel = 'h1' }: AccountOverview
               <dd>{formatTimestamp(profile.updatedAt)}</dd>
             </div>
           </dl>
-
-          <div className="account-overview__website-sync" role="status" aria-live="polite">
-            <p className="account-overview__website-sync-title">Turn on website sync.</p>
-            <p className="account-overview__hint">
-              Connect your store catalog to your website in minutes.
-              {' '}
-              <a href="/docs/integration-quickstart.md" target="_blank" rel="noreferrer">
-                Integration quickstart
-              </a>
-              {' · '}
-              <a href="/docs/wordpress-install-guide.md" target="_blank" rel="noreferrer">
-                Install on WordPress
-              </a>
-            </p>
-            <div className="account-overview__website-sync-actions">
-              <button
-                type="button"
-                className="button button--secondary"
-                onClick={handleCopyApiToken}
-                disabled={isCopyingApiToken}
-              >
-                {isCopyingApiToken ? 'Copying token…' : 'Copy API token'}
-              </button>
-              <button
-                type="button"
-                className="button button--secondary"
-                onClick={handleTestSedifexProducts}
-              >
-                Test Sedifex endpoint
-              </button>
-            </div>
-            {isOwner && (
-              <div className="account-overview__website-sync-test">
-                <label>
-                  <span>New integration key name</span>
-                  <input
-                    type="text"
-                    value={integrationKeyName}
-                    onChange={event => setIntegrationKeyName(event.target.value)}
-                    placeholder="WordPress storefront"
-                  />
-                </label>
-                <button
-                  type="button"
-                  className="button button--secondary"
-                  onClick={handleCreateIntegrationApiKey}
-                  disabled={isCreatingIntegrationKey}
-                >
-                  {isCreatingIntegrationKey ? 'Creating…' : 'Create integration key'}
-                </button>
-              </div>
-            )}
-            {isOwner && (
-              <div className="account-overview__website-sync-keys">
-                <p className="account-overview__hint">Active integration keys</p>
-                {integrationKeysLoading ? (
-                  <p className="account-overview__hint">Loading integration keys…</p>
-                ) : integrationApiKeys.length === 0 ? (
-                  <p className="account-overview__hint">No integration keys yet.</p>
-                ) : (
-                  <ul className="account-overview__integration-key-list">
-                    {integrationApiKeys.map(key => (
-                      <li key={key.id} className="account-overview__integration-key-item">
-                        <div>
-                          <strong>{key.name}</strong>
-                          <p className="account-overview__hint">
-                            {key.keyPreview}
-                            {' · '}
-                            {key.status}
-                            {' · '}
-                            Created {formatTimestamp(key.createdAt)}
-                          </p>
-                        </div>
-                        <div className="account-overview__website-sync-actions">
-                          <button
-                            type="button"
-                            className="button button--secondary"
-                            onClick={() => handleRotateIntegrationApiKey(key.id)}
-                            disabled={actioningKeyId === key.id || key.status === 'revoked'}
-                          >
-                            Rotate
-                          </button>
-                          <button
-                            type="button"
-                            className="button button--secondary"
-                            onClick={() => handleRevokeIntegrationApiKey(key.id)}
-                            disabled={actioningKeyId === key.id || key.status === 'revoked'}
-                          >
-                            Revoke
-                          </button>
-                        </div>
-                      </li>
-                    ))}
-                  </ul>
-                )}
-              </div>
-            )}
-            <div className="account-overview__website-sync-test">
-              <label>
-                <span>Test your endpoint</span>
-                <input
-                  type="url"
-                  value={endpointToTest}
-                  onChange={event => setEndpointToTest(event.target.value)}
-                  placeholder="https://example.com/api/sedifex-sync"
-                />
-              </label>
-              <button
-                type="button"
-                className="button button--secondary"
-                onClick={handleTestEndpoint}
-                disabled={isTestingEndpoint}
-              >
-                {isTestingEndpoint ? 'Testing…' : 'Test endpoint'}
-              </button>
-            </div>
-            {endpointTestStatus && <p className="account-overview__hint">{endpointTestStatus}</p>}
-          </div>
 
           {isOwner && isEditingProfile && (
             <form
@@ -1419,6 +1309,136 @@ export default function AccountOverview({ headingLevel = 'h1' }: AccountOverview
               </div>
             </form>
           )}
+        </section>
+      )}
+
+
+      {profile && activeTab === 'integrations' && (
+        <section aria-labelledby="account-overview-integrations">
+          <div className="account-overview__section-header">
+            <h2 id="account-overview-integrations">Website integrations</h2>
+            <p className="account-overview__subtitle">
+              Use this tab for WordPress or Next.js (Vercel) setup guides, API keys, and endpoint tests.
+            </p>
+          </div>
+
+          <div className="account-overview__website-sync" role="status" aria-live="polite">
+            <p className="account-overview__website-sync-title">Choose your integration tutorial.</p>
+            <p className="account-overview__hint">
+              Sedifex supports both WordPress and Next.js storefronts.
+              {' '}
+              <a href="/docs/integration-quickstart.md" target="_blank" rel="noreferrer">
+                Next.js + Vercel tutorial
+              </a>
+              {' · '}
+              <a href="/docs/wordpress-install-guide.md" target="_blank" rel="noreferrer">
+                WordPress tutorial
+              </a>
+            </p>
+            <div className="account-overview__website-sync-actions">
+              <button
+                type="button"
+                className="button button--secondary"
+                onClick={handleCopyApiToken}
+                disabled={isCopyingApiToken}
+              >
+                {isCopyingApiToken ? 'Copying token…' : 'Copy API token'}
+              </button>
+              <button
+                type="button"
+                className="button button--secondary"
+                onClick={handleTestSedifexProducts}
+              >
+                Test Sedifex endpoint
+              </button>
+            </div>
+            {isOwner && (
+              <div className="account-overview__website-sync-test">
+                <label>
+                  <span>New integration key name</span>
+                  <input
+                    type="text"
+                    value={integrationKeyName}
+                    onChange={event => setIntegrationKeyName(event.target.value)}
+                    placeholder="Website production key"
+                  />
+                </label>
+                <button
+                  type="button"
+                  className="button button--secondary"
+                  onClick={handleCreateIntegrationApiKey}
+                  disabled={isCreatingIntegrationKey}
+                >
+                  {isCreatingIntegrationKey ? 'Creating…' : 'Create integration key'}
+                </button>
+              </div>
+            )}
+            {isOwner && (
+              <div className="account-overview__website-sync-keys">
+                <p className="account-overview__hint">Active integration keys</p>
+                {integrationKeysLoading ? (
+                  <p className="account-overview__hint">Loading integration keys…</p>
+                ) : integrationApiKeys.length === 0 ? (
+                  <p className="account-overview__hint">No integration keys yet.</p>
+                ) : (
+                  <ul className="account-overview__integration-key-list">
+                    {integrationApiKeys.map(key => (
+                      <li key={key.id} className="account-overview__integration-key-item">
+                        <div>
+                          <strong>{key.name}</strong>
+                          <p className="account-overview__hint">
+                            {key.keyPreview}
+                            {' · '}
+                            {key.status}
+                            {' · '}
+                            Created {formatTimestamp(key.createdAt)}
+                          </p>
+                        </div>
+                        <div className="account-overview__website-sync-actions">
+                          <button
+                            type="button"
+                            className="button button--secondary"
+                            onClick={() => handleRotateIntegrationApiKey(key.id)}
+                            disabled={actioningKeyId === key.id || key.status === 'revoked'}
+                          >
+                            Rotate
+                          </button>
+                          <button
+                            type="button"
+                            className="button button--secondary"
+                            onClick={() => handleRevokeIntegrationApiKey(key.id)}
+                            disabled={actioningKeyId === key.id || key.status === 'revoked'}
+                          >
+                            Revoke
+                          </button>
+                        </div>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+            )}
+            <div className="account-overview__website-sync-test">
+              <label>
+                <span>Test your endpoint</span>
+                <input
+                  type="url"
+                  value={endpointToTest}
+                  onChange={event => setEndpointToTest(event.target.value)}
+                  placeholder="https://example.com/api/sedifex-sync"
+                />
+              </label>
+              <button
+                type="button"
+                className="button button--secondary"
+                onClick={handleTestEndpoint}
+                disabled={isTestingEndpoint}
+              >
+                {isTestingEndpoint ? 'Testing…' : 'Test endpoint'}
+              </button>
+            </div>
+            {endpointTestStatus && <p className="account-overview__hint">{endpointTestStatus}</p>}
+          </div>
         </section>
       )}
 

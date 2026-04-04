@@ -333,3 +333,23 @@
   flex-wrap: wrap;
   align-items: center;
 }
+
+
+.account-overview__website-sync-test input {
+  border: 1px solid #93c5fd;
+  background: #f8fbff;
+  color: #0f172a;
+  border-radius: 8px;
+  padding: 10px 12px;
+}
+
+.account-overview__website-sync-test input::placeholder {
+  color: #475569;
+}
+
+.account-overview__website-sync-test input:focus {
+  outline: none;
+  border-color: #2563eb;
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.2);
+  background: #ffffff;
+}
