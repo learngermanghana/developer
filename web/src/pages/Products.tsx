@@ -113,6 +113,7 @@ function mapFirestoreProduct(id: string, data: Record<string, unknown>): Product
   const normalizedBarcode = normalizeBarcode(barcodeSource)
 
   const itemType = data.itemType === 'service' ? 'service' : 'product'
+  const category = typeof data.category === 'string' ? data.category.trim() : ''
 
   const expiryDate = toDate(data.expiryDate)
   const productionDate = toDate(data.productionDate)
@@ -128,6 +129,7 @@ function mapFirestoreProduct(id: string, data: Record<string, unknown>): Product
   return {
     id,
     name: nameRaw.trim() || 'Untitled item',
+    category: category || null,
     sku: skuRaw.trim() || null,
     barcode: normalizedBarcode || null,
     price: sanitizeNumber(data.price) ?? null,
@@ -271,6 +273,7 @@ export default function Products() {
   const [name, setName] = useState('')
   const [itemType, setItemType] = useState<ItemType>('product')
   const [sku, setSku] = useState('')
+  const [categoryInput, setCategoryInput] = useState('')
   const [priceInput, setPriceInput] = useState('')
   const [taxRateInput, setTaxRateInput] = useState('')
   const [reorderPointInput, setReorderPointInput] = useState('')
@@ -295,6 +298,7 @@ export default function Products() {
   const [editName, setEditName] = useState('')
   const [editItemType, setEditItemType] = useState<ItemType>('product')
   const [editSku, setEditSku] = useState('')
+  const [editCategoryInput, setEditCategoryInput] = useState('')
   const [editPriceInput, setEditPriceInput] = useState('')
   const [editTaxRateInput, setEditTaxRateInput] = useState('')
   const [editReorderPointInput, setEditReorderPointInput] = useState('')
@@ -507,9 +511,10 @@ export default function Products() {
       const term = searchText.trim().toLowerCase()
       result = result.filter(p => {
         const inName = p.name.toLowerCase().includes(term)
+        const inCategory = (p.category ?? '').toLowerCase().includes(term)
         const inSku = (p.sku ?? '').toLowerCase().includes(term)
         const inBarcode = (p.barcode ?? '').toLowerCase().includes(term)
-        return inName || inSku || inBarcode
+        return inName || inCategory || inSku || inBarcode
       })
     }
 
@@ -589,6 +594,7 @@ export default function Products() {
     }
 
     const trimmedSku = sku.trim()
+    const trimmedCategory = categoryInput.trim()
     const normalizedName = normalizeLookupValue(trimmedName)
     const normalizedSku = normalizeBarcode(trimmedSku)
 
@@ -620,6 +626,7 @@ export default function Products() {
         storeId: activeStoreId,
         name: trimmedName,
         itemType,
+        category: trimmedCategory || null,
         price: finalPrice,
         // 🔹 Keep SKU as typed, but also store a normalized barcode field
         sku: isService ? null : trimmedSku || null,
@@ -651,6 +658,7 @@ export default function Products() {
       setName('')
       setItemType('product')
       setSku('')
+      setCategoryInput('')
       setPriceInput('')
       setTaxRateInput('')
       setReorderPointInput('')
@@ -757,6 +765,7 @@ export default function Products() {
     setEditName(product.name)
     setEditItemType(product.itemType)
     setEditSku(product.sku ?? '')
+    setEditCategoryInput(product.category ?? '')
     setEditPriceInput(
       typeof product.price === 'number' && Number.isFinite(product.price)
         ? String(product.price)
@@ -858,6 +867,7 @@ export default function Products() {
       !isStockTracked || stockNumberRaw === null ? null : Math.floor(stockNumberRaw)
 
     const trimmedSku = editSku.trim()
+    const trimmedCategory = editCategoryInput.trim()
 
     setFormStatus('idle')
     setFormError(null)
@@ -867,6 +877,7 @@ export default function Products() {
       await updateDoc(ref, {
         name: trimmedName,
         itemType: editItemType,
+        category: trimmedCategory || null,
         sku: isStockTracked ? trimmedSku || null : null,
         barcode: isStockTracked ? normalizeBarcode(trimmedSku) || null : null,
         price: finalPrice,
@@ -1082,6 +1093,18 @@ export default function Products() {
             </div>
 
             <div className="field">
+              <label className="field__label" htmlFor="add-category">
+                Category <span className="field__optional">(optional)</span>
+              </label>
+              <input
+                id="add-category"
+                placeholder="e.g. Beverages, Skin Care, Electronics"
+                value={categoryInput}
+                onChange={e => setCategoryInput(e.target.value)}
+              />
+            </div>
+
+            <div className="field">
               <label className="field__label" htmlFor="add-opening-stock">
                 Opening stock
               </label>
@@ -1287,7 +1310,7 @@ export default function Products() {
               </label>
               <input
                 id="products-search"
-                placeholder="Search by name, SKU, or barcode"
+                placeholder="Search by name, category, SKU, or barcode"
                 value={searchText}
                 onChange={e => setSearchText(e.target.value)}
               />
@@ -1513,6 +1536,19 @@ export default function Products() {
                           <p className="products-page__list-value">
                             {product.imageAlt || product.name}
                           </p>
+                        )}
+                      </div>
+
+                      <div className="products-page__list-field">
+                        <label className="field__label">Category</label>
+                        {isEditing ? (
+                          <input
+                            value={editCategoryInput}
+                            onChange={event => setEditCategoryInput(event.target.value)}
+                            placeholder="e.g. Beverages"
+                          />
+                        ) : (
+                          <p className="products-page__list-value">{product.category || '—'}</p>
                         )}
                       </div>
 
