@@ -24,35 +24,103 @@
     <main class="container section prose">
       <h1>Guides</h1>
 
-      <h2>WordPress setup guide</h2>
+      <h2>Integration delivery sequence (high confidence)</h2>
+      <p>
+        Recommended order for near-term product and operational payoff as of
+        <strong>April 4, 2026</strong>.
+      </p>
       <ol>
-        <li>Create a custom plugin to keep logic versioned and testable.</li>
-        <li>Add a server-side function that requests <code>/integrationProducts</code>.</li>
-        <li>Store API key securely in WordPress environment config.</li>
-        <li>Cache responses with WP Transients for 5–15 minutes.</li>
-        <li>Render products through a shortcode or Gutenberg block.</li>
+        <li>
+          <strong>Ship real integration API keys + revoke/rotate UI</strong>
+          <ul>
+            <li>Store-scoped key generation (prefix + hashed secret at rest).</li>
+            <li>In-app metadata: key name, created time, last used time, status.</li>
+            <li>One-time secret reveal at creation.</li>
+            <li>Immediate revoke and documented rotate flow with overlap window.</li>
+            <li>Audit log entries for create/revoke/rotate.</li>
+          </ul>
+        </li>
+        <li>
+          <strong>Ship WordPress plugin MVP</strong>
+          <ul>
+            <li>Plugin settings for API key + store selection.</li>
+            <li>Product shortcode/block rendering.</li>
+            <li>Sync health panel (last success/failure, item count, next retry).</li>
+            <li>30–120 second cache window + manual sync trigger.</li>
+          </ul>
+        </li>
+        <li>
+          <strong>Ship basic product webhooks</strong>
+          <ul>
+            <li><code>product.created</code>, <code>product.updated</code>, <code>product.deleted</code>.</li>
+            <li>Per-endpoint signing secret with <code>X-Sedifex-Signature</code>.</li>
+            <li>Retry policy with exponential backoff.</li>
+            <li>Delivery log view with attempts and response codes.</li>
+            <li>Copy/paste signature verification docs.</li>
+          </ul>
+        </li>
       </ol>
 
-      <h2>Common integration patterns</h2>
+      <h3>Suggested cadence</h3>
       <ul>
-        <li><strong>Server proxy:</strong> keep keys off client browsers.</li>
-        <li><strong>Nightly sync + webhooks:</strong> full sync then event deltas.</li>
-        <li><strong>Store isolation:</strong> enforce store-level scoping everywhere.</li>
+        <li><strong>Milestone A (Weeks 1–2):</strong> API keys + revoke/rotate UI + audit logs.</li>
+        <li><strong>Milestone B (Weeks 3–4):</strong> WordPress MVP + sync health + onboarding guide.</li>
+        <li><strong>Milestone C (Weeks 5–6):</strong> Webhooks + signing + delivery logs + verification docs.</li>
+      </ul>
+      <p>
+        <strong>Dependency note:</strong> if overlap is required, keep key-management primitives
+        (creation, hashing, revoke, rotate, audit) as non-negotiable before broad partner rollout.
+      </p>
+
+      <h2>WordPress install guide (Sedifex Sync)</h2>
+      <p>
+        Use this setup to connect a WordPress site to a Sedifex product catalog. If you are using
+        Next.js on Vercel, use <code>quickstart.html</code> instead.
+      </p>
+      <h3>What this setup does</h3>
+      <ol>
+        <li>Uses a Sedifex integration API key.</li>
+        <li>Calls the <code>integrationProducts</code> endpoint.</li>
+        <li>Renders products in WordPress via shortcode.</li>
+        <li>Applies dedupe + fallback + cache strategy.</li>
+      </ol>
+
+      <h3>Prerequisites</h3>
+      <ul>
+        <li>A WordPress site where you can install plugins.</li>
+        <li>A Sedifex integration API key for the target store.</li>
+        <li>Sedifex API base URL for your deployed Functions endpoint.</li>
       </ul>
 
-      <h2>Operational checklist rollout (monitoring + alerts)</h2>
-      <ol start="3">
+      <h3>Install steps</h3>
+      <ol>
         <li>
-          <strong>Operational visibility turned on:</strong> sync success/failure logging,
-          repeated-failure alerting, and rollback controls are now represented in console
-          dashboards.
+          Install plugin scaffold. You can use Code Snippets or your preferred plugin workflow. A
+          baseline is included in <code>wordpress-plugin-sedifex-sync.php</code>.
         </li>
         <li>
-          <strong>Webhook readiness (MVP):</strong> signed deliveries via
-          <code>X-Sedifex-Signature</code>, event ID idempotency guidance, and retry telemetry are
-          available for partner integrations.
+          Add a frontend/client script that requests
+          <code>integrationProducts?storeId=&lt;storeId&gt;</code> with
+          <code>Authorization: Bearer &lt;integration_key&gt;</code>.
+        </li>
+        <li>Create and place a shortcode like <code>[sedifex_products]</code>.</li>
+        <li>
+          Store config values:
+          <code>SEDIFEX_API_BASE_URL</code>, <code>SEDIFEX_STORE_ID</code>, and
+          <code>SEDIFEX_INTEGRATION_KEY</code>.
+        </li>
+        <li>
+          Validate rendering, out-of-stock handling (<code>stockCount &lt;= 0</code>), and fallback
+          behavior under fetch failure.
         </li>
       </ol>
+
+      <h3>Recommended hardening</h3>
+      <ul>
+        <li>Add a visible “Last synced at” timestamp.</li>
+        <li>Alert on repeated sync failures.</li>
+        <li>Rotate integration credentials periodically via Account → Integrations.</li>
+      </ul>
     </main>
   </body>
 </html>

@@ -48,6 +48,35 @@
   ]
 }</code></pre>
 
+      <h2>Customer import/export template fields</h2>
+      <p><strong>Required</strong></p>
+      <ul>
+        <li><code>name</code> — Primary customer name.</li>
+      </ul>
+      <p><strong>Optional</strong></p>
+      <ul>
+        <li><code>display_name</code> — Preferred display name.</li>
+        <li><code>phone</code> — Phone number (country code recommended).</li>
+        <li><code>email</code> — Customer email.</li>
+        <li><code>birthdate</code> — Format: <code>YYYY-MM-DD</code>.</li>
+        <li><code>notes</code> — Preferences or notes.</li>
+        <li><code>tags</code> — Comma-separated labels/tags.</li>
+      </ul>
+
+      <h2>Store promo profile canonical fields</h2>
+      <ul>
+        <li><code>promoTitle</code></li>
+        <li><code>promoSummary</code></li>
+        <li><code>promoStartDate</code></li>
+        <li><code>promoEndDate</code></li>
+        <li><code>promoSlug</code></li>
+        <li><code>promoWebsiteUrl</code></li>
+      </ul>
+      <p>
+        Also used with <code>displayName</code> / <code>name</code> as store-name fallback on promo
+        pages. This same promo field set is canonical in account/store profile typing as well.
+      </p>
+
       <h2>POST /developer/keys</h2>
       <p>Create a new integration key scoped to a specific store.</p>
 
@@ -59,15 +88,6 @@
 
       <h2>POST /developer/webhooks/{endpointId}/test</h2>
       <p>Send a signed test event to verify endpoint readiness.</p>
-
-      <h2>GET /developer/sync-runs</h2>
-      <p>
-        List product sync executions with status, duration, changed-row counts, and failure
-        reasons for operational dashboards.
-      </p>
-
-      <h2>POST /developer/sync-runs/{runId}/rollback</h2>
-      <p>Rollback catalog data to the last known-good snapshot when a load breaks.</p>
 
       <h2>GET /developer/webhooks/{endpointId}/deliveries</h2>
       <p>
