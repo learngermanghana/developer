@@ -59,6 +59,21 @@
 
       <h2>POST /developer/webhooks/{endpointId}/test</h2>
       <p>Send a signed test event to verify endpoint readiness.</p>
+
+      <h2>GET /developer/sync-runs</h2>
+      <p>
+        List product sync executions with status, duration, changed-row counts, and failure
+        reasons for operational dashboards.
+      </p>
+
+      <h2>POST /developer/sync-runs/{runId}/rollback</h2>
+      <p>Rollback catalog data to the last known-good snapshot when a load breaks.</p>
+
+      <h2>GET /developer/webhooks/{endpointId}/deliveries</h2>
+      <p>
+        Inspect webhook delivery attempts including retry schedule, response codes, and terminal
+        failure details.
+      </p>
     </main>
   </body>
 </html>
