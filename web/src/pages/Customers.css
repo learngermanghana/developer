@@ -9,27 +9,6 @@
   gap: 10px;
 }
 
-.customers-page__card--hidden-mobile {
-  display: none !important;
-}
-
-@media (min-width: 1080px) {
-  .customers-page__grid {
-    grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr);
-  }
-
-  .customers-page__tabs {
-    display: none;
-  }
-
-  .customers-page__card--hidden-mobile {
-    display: block !important;
-  }
-
-  .customers-page__card--hidden-mobile.customers-page__details {
-    display: flex !important;
-  }
-}
 
 .customers-page__section-header {
   display: flex;
@@ -195,10 +174,6 @@
 }
 
 @media (min-width: 1080px) {
-  .customers-page__details {
-    grid-column: span 2;
-  }
-
   .customers-page__toolbar {
     flex-direction: row;
     justify-content: space-between;
