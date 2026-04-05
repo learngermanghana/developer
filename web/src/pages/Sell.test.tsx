@@ -229,6 +229,21 @@ describe('Sell page', () => {
     // Skip UI assertion to avoid flakiness in headless environment.
   })
 
+  it('requires amount paid before recording a sale', async () => {
+    const user = userEvent.setup()
+
+    renderWithProviders(<Sell />)
+
+    const productButton = await screen.findByRole('button', { name: /iced coffee/i })
+    await user.click(productButton)
+
+    const recordButton = screen.getByRole('button', { name: /record sale/i })
+    await user.click(recordButton)
+
+    expect(await screen.findByText(/enter amount paid before recording the sale/i)).toBeInTheDocument()
+    expect(mockCommitSale).not.toHaveBeenCalled()
+  })
+
   it('stores outstanding balance in change due when payment is short', async () => {
     const user = userEvent.setup()
 

@@ -235,6 +235,118 @@ function createPairCode(length = 6) {
   return result
 }
 
+type ReceiptPrintOptions = {
+  saleId: string
+  items: { name: string; qty: number; price: number; metadata?: string[] }[]
+  totals: { subTotal: number; taxTotal: number; discount: number; total: number }
+  paymentMethod: PaymentMethod
+  tenders?: ReceiptTender[]
+  discountInput: string
+  companyName?: string | null
+  companyLogoUrl?: string | null
+  customerName?: string | null
+  customerPhone?: string | null
+  amountPaid: number
+  changeDue: number
+  receiptSize: EscPosReceiptSize
+}
+
+export function buildReceiptPrintHtml(options: ReceiptPrintOptions, receiptDate = new Date().toLocaleString()) {
+  const receiptWidth = options.receiptSize === '58mm' ? '58mm' : '80mm'
+  const contentWidth = options.receiptSize === '58mm' ? '48mm' : '72mm'
+  const paymentLabel =
+    options.tenders && options.tenders.length > 1
+      ? options.tenders.map(t => `${t.method.replace('_', ' ')} (${formatCurrency(t.amount)})`).join(' + ')
+      : options.paymentMethod.replace('_', ' ')
+  const customerLine =
+    options.customerName || options.customerPhone
+      ? `Customer: ${options.customerName ?? 'Walk-in'}${options.customerPhone ? ` (${options.customerPhone})` : ''}`
+      : null
+  const lineRows = options.items
+    .map(line => {
+      const total = line.price * line.qty
+      const metadataRows = (line.metadata ?? []).map(entry => `<tr class="meta-row"><td colspan="4">${entry}</td></tr>`).join('')
+      return `<tr>
+          <td>${line.name}</td>
+          <td style="text-align:right">${line.qty}</td>
+          <td style="text-align:right">${formatCurrency(line.price)}</td>
+          <td style="text-align:right">${formatCurrency(total)}</td>
+        </tr>${metadataRows}`
+    })
+    .join('')
+
+  return `<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <style>
+    @page { size: ${receiptWidth} auto; margin: 0; }
+    html, body {
+      margin: 0;
+      padding: 0;
+      width: ${receiptWidth};
+      max-width: ${receiptWidth};
+      overflow: hidden;
+      background: #fff;
+    }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      box-sizing: border-box;
+      padding: 6px;
+      color: #0f172a;
+      width: ${contentWidth};
+      max-width: ${contentWidth};
+      -webkit-print-color-adjust: exact;
+      print-color-adjust: exact;
+    }
+    @media print {
+      html, body {
+        width: ${receiptWidth} !important;
+        max-width: ${receiptWidth} !important;
+      }
+      body {
+        width: ${contentWidth} !important;
+        max-width: ${contentWidth} !important;
+      }
+    }
+    h1 { font-size: ${options.receiptSize === '58mm' ? '16px' : '18px'}; margin: 0 0 12px; }
+    table { width: 100%; border-collapse: collapse; margin-top: 8px; }
+    th, td { padding: 6px 4px; font-size: ${options.receiptSize === '58mm' ? '12px' : '13px'}; }
+    th { text-align: left; border-bottom: 1px solid #e2e8f0; }
+    tfoot td { font-weight: 700; border-top: 1px solid #e2e8f0; }
+    .meta { font-size: ${options.receiptSize === '58mm' ? '11px' : '12px'}; color: #475569; margin: 0; }
+    .meta-row td { font-size: ${options.receiptSize === '58mm' ? '11px' : '12px'}; color: #475569; padding-top: 0; }
+  </style>
+</head>
+<body>
+  <h1>Sale receipt</h1>
+  ${options.companyName ? `<p class="meta"><strong>${options.companyName}</strong></p>` : ''}
+  ${options.companyLogoUrl ? `<p class="meta"><img src="${options.companyLogoUrl}" alt="Store logo" style="max-width:80px;max-height:80px;object-fit:contain;" /></p>` : ''}
+  <p class="meta">Sale ID: ${options.saleId}</p>
+  <p class="meta">${receiptDate}</p>
+  <p class="meta">Payment: ${paymentLabel}</p>
+  ${customerLine ? `<p class="meta">${customerLine}</p>` : ''}
+
+  <table>
+    <thead>
+      <tr><th>Item</th><th style="text-align:right">Qty</th><th style="text-align:right">Price</th><th style="text-align:right">Total</th></tr>
+    </thead>
+    <tbody>${lineRows}</tbody>
+    <tfoot>
+      <tr><td colspan="3">Subtotal</td><td style="text-align:right">${formatCurrency(options.totals.subTotal)}</td></tr>
+      <tr><td colspan="3">VAT / Tax</td><td style="text-align:right">${formatCurrency(options.totals.taxTotal)}</td></tr>
+      <tr><td colspan="3">Discount</td><td style="text-align:right">${options.discountInput ? options.discountInput : 'None'}</td></tr>
+      <tr><td colspan="3">Total</td><td style="text-align:right">${formatCurrency(options.totals.total)}</td></tr>
+      <tr><td colspan="3">Amount paid</td><td style="text-align:right">${formatCurrency(options.amountPaid)}</td></tr>
+      <tr><td colspan="3">Change due</td><td style="text-align:right">${formatCurrency(options.changeDue)}</td></tr>
+      <tr><td colspan="3">Payment</td><td style="text-align:right">${paymentLabel}</td></tr>
+    </tfoot>
+  </table>
+</body>
+</html>`
+}
+
 /** ✅ iOS/iPadOS detection (for Share Sheet button label + behavior) */
 function isIOSLike() {
   const ua = navigator.userAgent || ''
@@ -1268,97 +1380,8 @@ export default function Sell() {
   }
 
   /** ✅ UPDATED: Print via iframe for ALL devices (no blank tab on iPhone) */
-  function printReceipt(options: {
-    saleId: string
-    items: { name: string; qty: number; price: number; metadata?: string[] }[]
-    totals: { subTotal: number; taxTotal: number; discount: number; total: number }
-    paymentMethod: PaymentMethod
-    tenders?: ReceiptTender[]
-    discountInput: string
-    companyName?: string | null
-    companyLogoUrl?: string | null
-    customerName?: string | null
-    customerPhone?: string | null
-    amountPaid: number
-    changeDue: number
-    receiptSize: EscPosReceiptSize
-  }) {
-    const receiptDate = new Date().toLocaleString()
-    const paymentLabel =
-      options.tenders && options.tenders.length > 1
-        ? options.tenders.map(t => `${t.method.replace('_', ' ')} (${formatCurrency(t.amount)})`).join(' + ')
-        : options.paymentMethod.replace('_', ' ')
-
-    const customerLine =
-      options.customerName || options.customerPhone
-        ? `Customer: ${options.customerName ?? 'Walk-in'}${options.customerPhone ? ` (${options.customerPhone})` : ''}`
-        : null
-
-    const lineRows = options.items
-      .map(line => {
-        const total = line.price * line.qty
-        const metadataRows = (line.metadata ?? []).map(entry => `<tr class="meta-row"><td colspan="4">${entry}</td></tr>`).join('')
-        return `<tr>
-          <td>${line.name}</td>
-          <td style="text-align:right">${line.qty}</td>
-          <td style="text-align:right">${formatCurrency(line.price)}</td>
-          <td style="text-align:right">${formatCurrency(total)}</td>
-        </tr>${metadataRows}`
-      })
-      .join('')
-
-    const receiptHtml = `<!doctype html>
-<html>
-<head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <style>
-    @page { size: ${options.receiptSize} auto; margin: 6mm; }
-    body {
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-      margin: 0;
-      padding: 6px;
-      color: #0f172a;
-      width: ${options.receiptSize === '58mm' ? '48mm' : '64mm'};
-      -webkit-print-color-adjust: exact;
-      print-color-adjust: exact;
-    }
-    h1 { font-size: ${options.receiptSize === '58mm' ? '16px' : '18px'}; margin: 0 0 12px; }
-    table { width: 100%; border-collapse: collapse; margin-top: 8px; }
-    th, td { padding: 6px 4px; font-size: ${options.receiptSize === '58mm' ? '12px' : '13px'}; }
-    th { text-align: left; border-bottom: 1px solid #e2e8f0; }
-    tfoot td { font-weight: 700; border-top: 1px solid #e2e8f0; }
-    .meta { font-size: ${options.receiptSize === '58mm' ? '11px' : '12px'}; color: #475569; margin: 0; }
-    .meta-row td { font-size: ${options.receiptSize === '58mm' ? '11px' : '12px'}; color: #475569; padding-top: 0; }
-  </style>
-</head>
-<body>
-  <h1>Sale receipt</h1>
-  ${options.companyName ? `<p class="meta"><strong>${options.companyName}</strong></p>` : ''}
-  ${options.companyLogoUrl ? `<p class="meta"><img src="${options.companyLogoUrl}" alt="Store logo" style="max-width:80px;max-height:80px;object-fit:contain;" /></p>` : ''}
-  <p class="meta">Sale ID: ${options.saleId}</p>
-  <p class="meta">${receiptDate}</p>
-  <p class="meta">Payment: ${paymentLabel}</p>
-  ${customerLine ? `<p class="meta">${customerLine}</p>` : ''}
-
-  <table>
-    <thead>
-      <tr><th>Item</th><th style="text-align:right">Qty</th><th style="text-align:right">Price</th><th style="text-align:right">Total</th></tr>
-    </thead>
-    <tbody>${lineRows}</tbody>
-    <tfoot>
-      <tr><td colspan="3">Subtotal</td><td style="text-align:right">${formatCurrency(options.totals.subTotal)}</td></tr>
-      <tr><td colspan="3">VAT / Tax</td><td style="text-align:right">${formatCurrency(options.totals.taxTotal)}</td></tr>
-      <tr><td colspan="3">Discount</td><td style="text-align:right">${options.discountInput ? options.discountInput : 'None'}</td></tr>
-      <tr><td colspan="3">Total</td><td style="text-align:right">${formatCurrency(options.totals.total)}</td></tr>
-      <tr><td colspan="3">Amount paid</td><td style="text-align:right">${formatCurrency(options.amountPaid)}</td></tr>
-      <tr><td colspan="3">Change due</td><td style="text-align:right">${formatCurrency(options.changeDue)}</td></tr>
-      <tr><td colspan="3">Payment</td><td style="text-align:right">${paymentLabel}</td></tr>
-    </tfoot>
-  </table>
-</body>
-</html>`
-
+  function printReceipt(options: ReceiptPrintOptions) {
+    const receiptHtml = buildReceiptPrintHtml(options)
     const iframe = document.createElement('iframe')
     iframe.style.position = 'fixed'
     iframe.style.right = '0'
@@ -1408,6 +1431,9 @@ export default function Sell() {
     if (!cart.length) return setErrorMessage('Add at least one item to the cart.')
     if (taxError) return setErrorMessage('Please fix the VAT field before saving.')
     if (discountError) return setErrorMessage('Please fix the discount field before saving.')
+    if (!hasExplicitPaymentInput) {
+      return setErrorMessage("Enter Amount paid before recording the sale. If payment is partial, enter what the client paid so the remaining debt is calculated.")
+    }
     if (customerMode === 'named' && !customerNameInput.trim()) return setErrorMessage('Enter or choose a customer name.')
     if (cart.some(line => !Number.isFinite(line.price) || line.price <= 0)) {
       return setErrorMessage('Enter a valid price for every item before saving.')
@@ -2030,8 +2056,16 @@ export default function Sell() {
                 </div>
 
                 <div className="field">
-                  <label className="field__label">Amount paid (optional)</label>
-                  <input type="number" min="0" step="0.01" placeholder="If customer pays cash" value={amountPaidInput} onChange={e => setAmountPaidInput(e.target.value)} />
+                  <label className="field__label">Amount paid (if client did not pay full, enter amount paid to calculate remaining debt)</label>
+                  <input
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    placeholder="Enter amount paid by client"
+                    value={amountPaidInput}
+                    onChange={e => setAmountPaidInput(e.target.value)}
+                  />
+                  <span className="field__hint">Required. Enter partial payment to track outstanding balance correctly.</span>
                   {totalAmountPaid > 0 && (
                     <p className={'sell-page__change ' + (isShortPayment ? 'is-short' : '')}>
                       {isShortPayment ? `Short by ${formatCurrency(totalAfterDiscount - totalAmountPaid)}` : `Change due: ${formatCurrency(changeDue)}`}
@@ -2089,6 +2123,30 @@ export default function Sell() {
           {successMessage && <p className="sell-page__message sell-page__message--success">{successMessage}</p>}
           {successMessage && (
             <div className="sell-page__actions" style={{ marginTop: 12 }}>
+              {lastReceipt && (
+                <button
+                  type="button"
+                  className="button button--ghost"
+                  onClick={() =>
+                    printReceipt({
+                      saleId: lastReceipt.saleId,
+                      items: lastReceipt.items,
+                      totals: lastReceipt.totals,
+                      paymentMethod: lastReceipt.paymentMethod,
+                      tenders: (lastReceipt as any).tenders,
+                      discountInput: lastReceipt.discountInput,
+                      companyName: lastReceipt.companyName,
+                      customerName: lastReceipt.customerName,
+                      customerPhone: (lastReceipt as any).customerPhone ?? null,
+                      amountPaid: (lastReceipt as any).amountPaid ?? lastReceipt.totals.total,
+                      changeDue: (lastReceipt as any).changeDue ?? 0,
+                      receiptSize,
+                    })
+                  }
+                >
+                  Print receipt
+                </button>
+              )}
               <button type="button" className="button button--primary" onClick={resetSaleDraft}>
                 Start next sale
               </button>
