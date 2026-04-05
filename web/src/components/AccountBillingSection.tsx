@@ -16,13 +16,14 @@ type PlanOption = {
   id: string
   label: string
   amountGhs: number
-  months: number
+  productLimit: number
+  dailySalesLimit: number
 }
 
 const PLANS: PlanOption[] = [
-  { id: 'starter-monthly', label: 'Starter – Monthly', amountGhs: 100, months: 1 },
-  { id: 'starter-biannual', label: 'Starter – Biannual', amountGhs: 600, months: 6 },
-  { id: 'starter-yearly', label: 'Starter – Yearly', amountGhs: 1100, months: 12 },
+  { id: 'starter', label: 'Starter', amountGhs: 20, productLimit: 100, dailySalesLimit: 100 },
+  { id: 'growth', label: 'Growth', amountGhs: 50, productLimit: 500, dailySalesLimit: 500 },
+  { id: 'scale', label: 'Scale', amountGhs: 100, productLimit: 2000, dailySalesLimit: 2000 },
 ]
 
 export const AccountBillingSection: React.FC<Props> = ({
@@ -38,33 +39,18 @@ export const AccountBillingSection: React.FC<Props> = ({
   const defaultPlanId = PLANS[0]?.id ?? ''
   const [selectedPlanId, setSelectedPlanId] = useState<string>(defaultPlanId)
   const [loading, setLoading] = useState(false)
-  const [upgradeLoading, setUpgradeLoading] = useState(false)
   const [cancelLoading, setCancelLoading] = useState(false)
   const [cancelConfirming, setCancelConfirming] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [cancelSuccess, setCancelSuccess] = useState(false)
 
   const selectedPlan = PLANS.find(plan => plan.id === selectedPlanId) ?? null
-  const selectedCadenceLabel = (() => {
-    if (selectedPlan?.months === 12) return 'Yearly'
-    if (selectedPlan?.months === 6) return 'Biannual'
-    return 'Monthly'
-  })()
-  const selectedCadenceDescription = (() => {
-    if (selectedPlan?.months === 12) return 'Billed once per year.'
-    if (selectedPlan?.months === 6) return 'Billed every 6 months.'
-    return 'Billed every month.'
-  })()
-  const renewalIntervalMonths = selectedPlan?.months ?? 1
-  const renewalCadenceLabel = (() => {
-    if (selectedPlan?.months === 12) return 'year'
-    if (selectedPlan?.months === 6) return '6 months'
-    return 'month'
-  })()
+  const selectedCadenceLabel = 'Monthly'
+  const selectedCadenceDescription = 'Billed every month.'
   const nextChargeDate = (() => {
     const base = new Date()
     const nextDate = new Date(base)
-    nextDate.setMonth(base.getMonth() + renewalIntervalMonths)
+    nextDate.setMonth(base.getMonth() + 1)
     return nextDate
   })()
   const nextChargeDisplay = nextChargeDate.toLocaleDateString(undefined, {
@@ -73,10 +59,6 @@ export const AccountBillingSection: React.FC<Props> = ({
 
   const billingPlanDisplay =
     PLANS.find(plan => plan.id === billingPlan)?.label ?? billingPlan ?? null
-  const monthlyPlan = PLANS.find(plan => plan.id.includes('monthly')) ?? null
-  const yearlyPlan = PLANS.find(plan => plan.id.includes('year')) ?? null
-  const yearlySavings =
-    monthlyPlan && yearlyPlan ? monthlyPlan.amountGhs * 12 - yearlyPlan.amountGhs : null
 
   const normalizedContractStatus = contractStatus?.toLowerCase() ?? null
   const hasPaidContract = normalizedContractStatus === 'active'
@@ -145,16 +127,6 @@ export const AccountBillingSection: React.FC<Props> = ({
     await startCheckoutForPlan(selectedPlanId)
   }
 
-  const handleUpgradeToYearly = async () => {
-    setError(null)
-    setUpgradeLoading(true)
-    try {
-      await startCheckoutForPlan('starter-yearly')
-    } finally {
-      setUpgradeLoading(false)
-    }
-  }
-
   const beginCancelSubscription = () => {
     setError(null)
     setCancelSuccess(false)
@@ -188,8 +160,6 @@ export const AccountBillingSection: React.FC<Props> = ({
       setCancelLoading(false)
     }
   }
-
-  const isYearlyPlan = billingPlan?.toLowerCase().includes('year') ?? false
 
   if (isPwaApp) {
     return (
@@ -272,38 +242,6 @@ export const AccountBillingSection: React.FC<Props> = ({
               Next renewal: <strong>{contractEndDate ?? '—'}</strong>
             </p>
 
-            {!isYearlyPlan && (
-              <div className="rounded border border-gray-200 bg-white p-3 space-y-3">
-                <div className="space-y-1">
-                  <p className="text-sm font-medium text-gray-900">Upgrade to yearly billing</p>
-                  <p className="text-xs text-gray-600">
-                    Current plan: {billingPlanDisplay ?? 'Monthly plan'}
-                    {monthlyPlan ? ` at GHS ${monthlyPlan.amountGhs.toFixed(2)} / month.` : '.'}
-                  </p>
-                  {yearlyPlan && (
-                    <p className="text-xs text-gray-600">
-                      Yearly plan: GHS {yearlyPlan.amountGhs.toFixed(2)} billed once per year.
-                      {yearlySavings !== null && yearlySavings > 0
-                        ? ` Save GHS ${yearlySavings.toFixed(2)} compared to monthly.`
-                        : ''}
-                    </p>
-                  )}
-                </div>
-                <div className="flex items-center gap-3">
-                <button
-                  type="button"
-                  className="button button--secondary"
-                  onClick={handleUpgradeToYearly}
-                  disabled={loading || upgradeLoading}
-                >
-                  {upgradeLoading ? 'Starting upgrade…' : 'Upgrade to yearly'}
-                </button>
-                <p className="text-xs text-gray-600">
-                  Extends your contract term for 12 months and simplifies renewals.
-                </p>
-                </div>
-              </div>
-            )}
             <div className="rounded border border-gray-200 bg-white p-3 space-y-2">
               <p className="text-sm font-medium text-gray-900">Cancel your subscription</p>
               <p className="text-xs text-gray-600">
@@ -397,7 +335,11 @@ export const AccountBillingSection: React.FC<Props> = ({
                 </p>
                 <p>Billing cadence: {selectedCadenceDescription}</p>
                 <p>
-                  Renews automatically every {renewalCadenceLabel}.
+                  Plan limits: up to {selectedPlan?.productLimit ?? '—'} products and{' '}
+                  {selectedPlan?.dailySalesLimit ?? '—'} sales/day.
+                </p>
+                <p>
+                  Renews automatically every month.
                 </p>
                 <p>
                   Estimated next charge:{' '}
