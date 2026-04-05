@@ -78,8 +78,9 @@ describe('AccountBillingSection', () => {
       expect(mockStartPaystackCheckout).toHaveBeenCalledWith({
         email: 'owner@example.com',
         storeId: 'store-123',
-        amount: 50,
+        amount: 600,
         plan: 'growth',
+        contractMonths: 12,
         redirectUrl: expect.stringContaining('/billing/verify'),
         metadata: { source: 'account-contract-billing' },
       })

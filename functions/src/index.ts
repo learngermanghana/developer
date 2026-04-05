@@ -68,7 +68,7 @@ type ManageStaffPayload = {
   action?: unknown
 }
 
-type BillingStatus = 'trial' | 'active' | 'past_due'
+type BillingStatus = 'trial' | 'active' | 'past_due' | 'inactive'
 
 type CreateCheckoutPayload = {
   email?: unknown
@@ -863,6 +863,17 @@ export const resolveStoreAccess = functions.https.onCall(
 
     const trialDaysRemaining = calculateDaysRemaining(trialEndsAt, nowTs)
     const graceDaysRemaining = calculateDaysRemaining(graceEndsAt, nowTs)
+    const contractEndRaw =
+      baseStore.contractEnd ||
+      previousBilling.currentPeriodEnd ||
+      previousBilling.contractEnd ||
+      null
+    const contractEndTs =
+      contractEndRaw && typeof contractEndRaw.toDate === 'function' ? contractEndRaw : null
+    const contractExpired =
+      !!contractEndTs &&
+      typeof contractEndTs.toMillis === 'function' &&
+      contractEndTs.toMillis() <= nowTs.toMillis()
 
     const trialExpired =
       (normalizedContractStatus === 'trial' || billingStatus === 'trial') &&
@@ -870,15 +881,21 @@ export const resolveStoreAccess = functions.https.onCall(
       trialDaysRemaining !== null &&
       trialDaysRemaining <= 0
 
-    const normalizedBillingStatus: BillingStatus = trialExpired ? 'past_due' : billingStatus
+    const normalizedBillingStatus: BillingStatus = contractExpired
+      ? 'inactive'
+      : trialExpired
+        ? 'past_due'
+        : billingStatus
 
-    const normalizedPaymentStatus: BillingStatus = trialExpired
-      ? 'past_due'
-      : paymentStatusRaw === 'active'
-        ? 'active'
-        : paymentStatusRaw === 'past_due'
-          ? 'past_due'
-          : billingStatus
+    const normalizedPaymentStatus: BillingStatus = contractExpired
+      ? 'inactive'
+      : trialExpired
+        ? 'past_due'
+        : paymentStatusRaw === 'active'
+          ? 'active'
+          : paymentStatusRaw === 'past_due'
+            ? 'past_due'
+            : billingStatus
 
     const graceExpired =
       normalizedPaymentStatus === 'past_due' &&
@@ -924,7 +941,9 @@ export const resolveStoreAccess = functions.https.onCall(
       ownerEmail: baseStore.ownerEmail || email || null,
       status: baseStore.status || 'active',
       workspaceSlug: baseStore.workspaceSlug || workspaceSlug,
-      contractStatus: contractStatusRaw || baseStore.contractStatus || 'trial',
+      contractStatus: contractExpired
+        ? 'inactive'
+        : contractStatusRaw || baseStore.contractStatus || 'trial',
       productCount:
         typeof baseStore.productCount === 'number' ? baseStore.productCount : 0,
       totalStockCount:
@@ -2743,6 +2762,85 @@ function resolvePlanDefaultAmount(planKey: string | null): number {
   return 20
 }
 
+function toTwoDecimals(value: number): number {
+  return Math.round(value * 100) / 100
+}
+
+function resolvePlanRank(planKey: string | null): number {
+  if (!planKey) return 0
+  const lower = planKey.toLowerCase()
+  if (lower.includes('scale')) return 3
+  if (lower.includes('growth')) return 2
+  if (lower.includes('starter')) return 1
+  return 0
+}
+
+function resolveContractMonths(raw: unknown): number {
+  const value = Number(raw)
+  if (!Number.isFinite(value)) return 1
+  const rounded = Math.floor(value)
+  if (rounded <= 0) return 1
+  if (rounded > 24) return 24
+  return rounded
+}
+
+function resolveContractQuote(input: {
+  targetPlanKey: string | null
+  contractMonths: number
+  currentPlanKey: string | null
+  currentPeriodStart: admin.firestore.Timestamp | null
+  currentPeriodEnd: admin.firestore.Timestamp | null
+  currentAmountPaid: number | null
+  now: Date
+}) {
+  const targetPlanAmount = resolvePlanDefaultAmount(input.targetPlanKey)
+  const grossAmount = toTwoDecimals(targetPlanAmount * input.contractMonths)
+
+  const isUpgrade = resolvePlanRank(input.targetPlanKey) > resolvePlanRank(input.currentPlanKey)
+  if (!isUpgrade) {
+    return {
+      grossAmount,
+      creditAmount: 0,
+      netAmount: grossAmount,
+    }
+  }
+
+  const periodStart = input.currentPeriodStart?.toDate?.() ?? null
+  const periodEnd = input.currentPeriodEnd?.toDate?.() ?? null
+  const currentAmountPaid =
+    typeof input.currentAmountPaid === 'number' && Number.isFinite(input.currentAmountPaid)
+      ? input.currentAmountPaid
+      : null
+
+  if (!periodStart || !periodEnd || !currentAmountPaid) {
+    return {
+      grossAmount,
+      creditAmount: 0,
+      netAmount: grossAmount,
+    }
+  }
+
+  const totalMs = periodEnd.getTime() - periodStart.getTime()
+  const remainingMs = periodEnd.getTime() - input.now.getTime()
+  if (totalMs <= 0 || remainingMs <= 0) {
+    return {
+      grossAmount,
+      creditAmount: 0,
+      netAmount: grossAmount,
+    }
+  }
+
+  const remainingRatio = Math.min(1, Math.max(0, remainingMs / totalMs))
+  const creditAmount = toTwoDecimals(currentAmountPaid * remainingRatio)
+  const netAmount = toTwoDecimals(Math.max(0, grossAmount - creditAmount))
+
+  return {
+    grossAmount,
+    creditAmount,
+    netAmount,
+  }
+}
+
 function addMonths(base: Date, months: number) {
   const d = new Date(base.getTime())
   const day = d.getDate()
@@ -2813,11 +2911,37 @@ export const createPaystackCheckout = functions.https.onCall(
       resolvePlanKey((payload as any).planKey) ||
       'starter'
 
-    const amountInput = Number((payload as any).amount)
-    const amountGhs =
-      Number.isFinite(amountInput) && amountInput > 0
-        ? amountInput
-        : resolvePlanDefaultAmount(planKey)
+    const contractMonths = resolveContractMonths((payload as any).contractMonths)
+    const requestedAmountInput = Number((payload as any).amount)
+    const requestedAmount =
+      Number.isFinite(requestedAmountInput) && requestedAmountInput > 0
+        ? requestedAmountInput
+        : null
+
+    const currentPlanKey = resolvePlanKey(billing.planKey) || resolvePlanKey(storeData.billingPlan)
+    const currentPeriodStart =
+      billing.currentPeriodStart instanceof admin.firestore.Timestamp
+        ? billing.currentPeriodStart
+        : null
+    const currentPeriodEnd =
+      billing.currentPeriodEnd instanceof admin.firestore.Timestamp
+        ? billing.currentPeriodEnd
+        : null
+    const currentAmountPaid =
+      typeof billing.amountPaid === 'number' && Number.isFinite(billing.amountPaid)
+        ? billing.amountPaid
+        : null
+
+    const quote = resolveContractQuote({
+      targetPlanKey: planKey,
+      contractMonths,
+      currentPlanKey,
+      currentPeriodStart,
+      currentPeriodEnd,
+      currentAmountPaid,
+      now: new Date(),
+    })
+    const amountGhs = requestedAmount ?? quote.netAmount
 
     const amountMinorUnits = toMinorUnits(amountGhs)
     const reference = `${storeId}_${Date.now()}`
@@ -2844,6 +2968,11 @@ export const createPaystackCheckout = functions.https.onCall(
         storeId,
         userId: uid,
         planKey,
+        contractMonths,
+        grossAmount: quote.grossAmount,
+        creditAmount: quote.creditAmount,
+        netAmount: amountGhs,
+        currentPlanKey: currentPlanKey || null,
         ...metadataIn,
       },
     }
@@ -2851,9 +2980,6 @@ export const createPaystackCheckout = functions.https.onCall(
     if (callbackUrl) {
       body.callback_url = callbackUrl
     }
-
-    const planCode = resolvePaystackPlanCode(planKey, paystackConfig)
-    if (planCode) body.plan = planCode
 
     let responseJson: any
     try {
@@ -2910,6 +3036,10 @@ export const createPaystackCheckout = functions.https.onCall(
           lastCheckoutUrl: authUrl,
           lastCheckoutAt: timestamp,
           lastChargeReference: reference,
+          pendingContractMonths: contractMonths,
+          pendingUpgradeCreditAmount: quote.creditAmount,
+          pendingGrossAmount: quote.grossAmount,
+          pendingNetAmount: amountGhs,
         },
         paymentProvider: 'paystack',
         paymentStatus: 'pending',
@@ -2925,6 +3055,9 @@ export const createPaystackCheckout = functions.https.onCall(
         plan: planKey,
         reference,
         amount: amountGhs,
+        grossAmount: quote.grossAmount,
+        creditAmount: quote.creditAmount,
+        contractMonths,
         currency: paystackConfig.currency,
         email,
         lastCheckoutUrl: authUrl,
@@ -3385,6 +3518,11 @@ export const handlePaystackWebhook = functions.https.onRequest(async (req, res) 
       const customer = data.customer || {}
       const subscription = data.subscription || {}
       const plan = data.plan || {}
+      const contractMonths = resolveContractMonths(metadata.contractMonths)
+      const paidAtDate = new Date(typeof data.paid_at === 'string' ? data.paid_at : Date.now())
+      const contractEndDate = addMonths(paidAtDate, contractMonths)
+      const amountPaid =
+        typeof data.amount === 'number' ? toTwoDecimals(data.amount / 100) : null
 
       await storeRef.set(
         {
@@ -3398,8 +3536,8 @@ export const handlePaystackWebhook = functions.https.onRequest(async (req, res) 
             status: 'active',
             currency: paystackConfig.currency,
             paystackCustomerCode: customer.customer_code || null,
-            paystackSubscriptionCode: subscription.subscription_code || null,
-            paystackEmailToken: subscription.email_token || null,
+            paystackSubscriptionCode: null,
+            paystackEmailToken: null,
             paystackPlanCode:
               (plan && typeof plan.plan_code === 'string' && plan.plan_code) ||
               resolvePaystackPlanCode(
@@ -3409,38 +3547,25 @@ export const handlePaystackWebhook = functions.https.onRequest(async (req, res) 
                 paystackConfig,
               ) ||
               null,
-            currentPeriodStart: admin.firestore.Timestamp.fromDate(
-              new Date(typeof data.paid_at === 'string' ? data.paid_at : Date.now()),
-            ),
-            currentPeriodEnd: admin.firestore.Timestamp.fromDate(
-              addMonths(
-                new Date(typeof data.paid_at === 'string' ? data.paid_at : Date.now()),
-                resolvePlanMonths(
-                  resolvePlanKey(metadata.planKey) ||
-                    resolvePlanKey(metadata.plan) ||
-                    resolvePlanKey(metadata.planId),
-                ),
-              ),
-            ),
-            lastPaymentAt: admin.firestore.Timestamp.fromDate(
-              new Date(typeof data.paid_at === 'string' ? data.paid_at : Date.now()),
-            ),
+            currentPeriodStart: admin.firestore.Timestamp.fromDate(paidAtDate),
+            currentPeriodEnd: admin.firestore.Timestamp.fromDate(contractEndDate),
+            contractMonths,
+            lastPaymentAt: admin.firestore.Timestamp.fromDate(paidAtDate),
             lastEventAt: timestamp,
             lastChargeReference: data.reference || null,
-            amountPaid: typeof data.amount === 'number' ? data.amount / 100 : null,
+            amountPaid,
+            grossAmount:
+              typeof metadata.grossAmount === 'number' && Number.isFinite(metadata.grossAmount)
+                ? metadata.grossAmount
+                : amountPaid,
+            creditAmount:
+              typeof metadata.creditAmount === 'number' && Number.isFinite(metadata.creditAmount)
+                ? metadata.creditAmount
+                : 0,
           },
           paymentStatus: 'active',
           contractStatus: 'active',
-          contractEnd: admin.firestore.Timestamp.fromDate(
-            addMonths(
-              new Date(typeof data.paid_at === 'string' ? data.paid_at : Date.now()),
-              resolvePlanMonths(
-                resolvePlanKey(metadata.planKey) ||
-                  resolvePlanKey(metadata.plan) ||
-                  resolvePlanKey(metadata.planId),
-              ),
-            ),
-          ),
+          contractEnd: admin.firestore.Timestamp.fromDate(contractEndDate),
         },
         { merge: true },
       )
@@ -3455,26 +3580,22 @@ export const handlePaystackWebhook = functions.https.onRequest(async (req, res) 
             resolvePlanKey(metadata.planId) ||
             'starter',
           reference: data.reference || null,
-          amount: typeof data.amount === 'number' ? data.amount / 100 : null,
+          amount: amountPaid,
+          grossAmount:
+            typeof metadata.grossAmount === 'number' && Number.isFinite(metadata.grossAmount)
+              ? metadata.grossAmount
+              : amountPaid,
+          creditAmount:
+            typeof metadata.creditAmount === 'number' && Number.isFinite(metadata.creditAmount)
+              ? metadata.creditAmount
+              : 0,
           currency: paystackConfig.currency,
-          paystackSubscriptionCode: subscription.subscription_code || null,
-          paystackEmailToken: subscription.email_token || null,
-          currentPeriodStart: admin.firestore.Timestamp.fromDate(
-            new Date(typeof data.paid_at === 'string' ? data.paid_at : Date.now()),
-          ),
-          currentPeriodEnd: admin.firestore.Timestamp.fromDate(
-            addMonths(
-              new Date(typeof data.paid_at === 'string' ? data.paid_at : Date.now()),
-              resolvePlanMonths(
-                resolvePlanKey(metadata.planKey) ||
-                  resolvePlanKey(metadata.plan) ||
-                  resolvePlanKey(metadata.planId),
-              ),
-            ),
-          ),
-          lastPaymentAt: admin.firestore.Timestamp.fromDate(
-            new Date(typeof data.paid_at === 'string' ? data.paid_at : Date.now()),
-          ),
+          paystackSubscriptionCode: null,
+          paystackEmailToken: null,
+          contractMonths,
+          currentPeriodStart: admin.firestore.Timestamp.fromDate(paidAtDate),
+          currentPeriodEnd: admin.firestore.Timestamp.fromDate(contractEndDate),
+          lastPaymentAt: admin.firestore.Timestamp.fromDate(paidAtDate),
           updatedAt: timestamp,
           lastEvent: eventName,
         },
