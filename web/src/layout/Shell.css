@@ -225,11 +225,6 @@ body.shell--menu-open {
   box-shadow: 0 6px 18px rgba(67, 56, 202, 0.18);
 }
 
-.shell__nav-link.is-parent-active {
-  border-color: #c7d2fe;
-  box-shadow: 0 0 0 2px rgba(199, 210, 254, 0.65);
-}
-
 .shell__nav-link--sub {
   background: #f8fafc;
   color: #334155;

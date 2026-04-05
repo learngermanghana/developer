@@ -347,45 +347,16 @@ export default function Shell({ children }: { children: React.ReactNode }) {
                 aria-label="Primary"
                 id="primary-nav"
               >
-                {navTree.map(({ item, children }) => {
-                  const isChildActive = children.some(
-                    child =>
-                      location.pathname === child.to ||
-                      location.pathname.startsWith(`${child.to}/`),
-                  )
-
-                  return (
-                    <div
-                      key={item.to}
-                      className={`shell__nav-item-group${children.length > 0 ? ' has-children' : ''}`}
-                    >
-                      <NavLink
-                        to={item.to}
-                        end={item.end}
-                        className={({ isActive }) =>
-                          `${navLinkClass(isActive, false)}${isChildActive ? ' is-parent-active' : ''}`
-                        }
-                      >
-                        {item.label}
-                      </NavLink>
-
-                      {children.length > 0 && (
-                        <div className="shell__subnav" role="group" aria-label={`${item.label} links`}>
-                          {children.map(child => (
-                            <NavLink
-                              key={child.to}
-                              to={child.to}
-                              end={child.end}
-                              className={({ isActive }) => navLinkClass(isActive, true)}
-                            >
-                              {child.label}
-                            </NavLink>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                  )
-                })}
+                {navItems.map(item => (
+                  <NavLink
+                    key={item.to}
+                    to={item.to}
+                    end={item.end}
+                    className={({ isActive }) => navLinkClass(isActive, Boolean(item.parentTo))}
+                  >
+                    {item.label}
+                  </NavLink>
+                ))}
               </nav>
             </div>
 
