@@ -1154,7 +1154,7 @@ export default function Customers() {
             className={`button button--small ${activeTab === 'view' ? 'button--primary' : 'button--ghost'}`}
             onClick={() => setActiveTab('view')}
           >
-            View customers
+            View all customers
           </button>
           <button
             type="button"
@@ -1163,11 +1163,12 @@ export default function Customers() {
             className={`button button--small ${activeTab === 'add' ? 'button--primary' : 'button--ghost'}`}
             onClick={() => setActiveTab('add')}
           >
-            Add customer
+            Add new customer
           </button>
         </div>
 
-        <section className={`card ${activeTab !== 'add' ? 'customers-page__card--hidden-mobile' : ''}`} aria-label="Add a customer">
+        {activeTab === 'add' ? (
+          <section className="card" aria-label="Add a customer">
           <div className="customers-page__section-header">
             <h3 className="card__title">{editingCustomerId ? 'Update customer' : 'New customer'}</h3>
             <p className="card__subtitle">
@@ -1307,9 +1308,12 @@ export default function Customers() {
               Customers saved here appear in the checkout flow. Visit the <Link to="/sell">Sell page</Link> to try it out.
             </p>
           </form>
-        </section>
+          </section>
+        ) : null}
 
-        <section className={`card ${activeTab !== 'view' ? 'customers-page__card--hidden-mobile' : ''}`} aria-label="Saved customers">
+        {activeTab === 'view' ? (
+          <>
+            <section className="card" aria-label="Saved customers">
           <div className="customers-page__section-header">
             <h3 className="card__title">Customer list</h3>
             <p className="card__subtitle">
@@ -1506,9 +1510,9 @@ export default function Customers() {
               <p>Adjust your search or quick filters, or add customers using the form.</p>
             </div>
           )}
-        </section>
+            </section>
 
-        <section className={`card customers-page__details ${activeTab !== 'view' ? 'customers-page__card--hidden-mobile' : ''}`} aria-label="Customer details">
+            <section className="card customers-page__details" aria-label="Customer details">
           {selectedCustomer ? (
             <div className="customers-page__details-content">
               <div className="customers-page__section-header">
@@ -1690,7 +1694,9 @@ export default function Customers() {
               </p>
             </div>
           )}
-        </section>
+            </section>
+          </>
+        ) : null}
       </div>
 
       {messageChannel ? (
