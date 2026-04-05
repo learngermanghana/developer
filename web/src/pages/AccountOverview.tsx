@@ -872,6 +872,12 @@ export default function AccountOverview({
     }
   }
 
+  function handleDeletePromoImage() {
+    setPromoImageFile(null)
+    setPromoDraft(current => ({ ...current, imageUrl: '' }))
+    publish({ tone: 'success', message: 'Promo image removed. Save the promo to apply this change.' })
+  }
+
   function updatePromoGalleryDraft(
     id: string,
     key: keyof Omit<PromoGalleryDraftItem, 'id'>,
@@ -2034,6 +2040,15 @@ export default function AccountOverview({
                   >
                     Clear image
                   </button>
+                  {promoDraft.imageUrl.trim().length > 0 ? (
+                    <button
+                      type="button"
+                      className="button button--ghost"
+                      onClick={handleDeletePromoImage}
+                    >
+                      Delete uploaded image
+                    </button>
+                  ) : null}
                 </div>
                 {promoImageUploadError ? (
                   <p role="alert" style={{ color: '#dc2626', marginTop: 6 }}>
@@ -2106,6 +2121,39 @@ export default function AccountOverview({
                 {promoGalleryDraft.length === 0 && !promoGalleryLoading ? (
                   <p className="account-overview__hint">No gallery items yet.</p>
                 ) : null}
+                {promoGalleryDraft.length > 0 ? (
+                  <div style={{ marginBottom: 12 }}>
+                    <p className="account-overview__hint" style={{ marginTop: 0 }}>
+                      Uploaded gallery images preview
+                    </p>
+                    <div style={{ display: 'grid', gap: 10, gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))' }}>
+                      {promoGalleryDraft
+                        .filter(item => item.url.trim().length > 0)
+                        .map(item => (
+                          <figure
+                            key={`preview-${item.id}`}
+                            style={{
+                              margin: 0,
+                              border: '1px solid #e5e7eb',
+                              borderRadius: 10,
+                              overflow: 'hidden',
+                              background: '#fff',
+                            }}
+                          >
+                            <img
+                              src={item.url}
+                              alt={item.alt || 'Gallery image preview'}
+                              style={{ width: '100%', height: 120, objectFit: 'cover', display: 'block' }}
+                              loading="lazy"
+                            />
+                            <figcaption style={{ padding: '6px 8px', fontSize: 12, color: '#4b5563' }}>
+                              {item.caption || item.alt || 'Gallery image'}
+                            </figcaption>
+                          </figure>
+                        ))}
+                    </div>
+                  </div>
+                ) : null}
                 <p className="account-overview__hint" style={{ marginTop: 0 }}>
                   To save storage costs, each store can upload up to {MAX_PROMO_GALLERY_ITEMS} photos.
                 </p>
@@ -2134,6 +2182,14 @@ export default function AccountOverview({
                           placeholder="https://..."
                         />
                       </label>
+                      {item.url.trim().length > 0 ? (
+                        <img
+                          src={item.url}
+                          alt={item.alt || 'Gallery image'}
+                          style={{ width: '100%', maxWidth: 280, maxHeight: 180, objectFit: 'cover', borderRadius: 8, border: '1px solid #e5e7eb' }}
+                          loading="lazy"
+                        />
+                      ) : null}
                       <label style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
                         <span className="account-overview__gallery-label">Alt text</span>
                         <input

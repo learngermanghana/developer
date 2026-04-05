@@ -229,6 +229,32 @@ describe('Sell page', () => {
     // Skip UI assertion to avoid flakiness in headless environment.
   })
 
+  it('stores outstanding balance in change due when payment is short', async () => {
+    const user = userEvent.setup()
+
+    renderWithProviders(<Sell />)
+
+    const productButton = await screen.findByRole('button', { name: /iced coffee/i })
+    await user.click(productButton)
+
+    const cashInput = screen.getByLabelText(/cash received/i)
+    await user.clear(cashInput)
+    await user.type(cashInput, '10')
+
+    const recordButton = screen.getByRole('button', { name: /record sale/i })
+    await user.click(recordButton)
+
+    await waitFor(() => {
+      expect(mockCommitSale).toHaveBeenCalledTimes(1)
+    })
+
+    expect(mockCommitSale).toHaveBeenCalledWith(
+      expect.objectContaining({
+        payment: expect.objectContaining({ method: 'cash', amountPaid: 10, changeDue: 2 }),
+      }),
+    )
+  })
+
   it('queues a sale offline when the callable returns an internal error', async () => {
     const user = userEvent.setup()
     const internalErrorMessage = 'Callable internal error should not leak'
