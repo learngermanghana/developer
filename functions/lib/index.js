@@ -1498,6 +1498,9 @@ exports.rotateIntegrationApiKey = functions.https.onCall(async (data, context) =
 });
 function setIntegrationResponseHeaders(res) {
     const configuredApiBaseUrl = SEDIFEX_API_BASE_URL.value().trim();
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Access-Control-Allow-Methods', 'GET,OPTIONS');
+    res.setHeader('Access-Control-Allow-Headers', 'Authorization,Content-Type');
     if (configuredApiBaseUrl) {
         res.setHeader('x-sedifex-api-base-url', configuredApiBaseUrl);
     }
@@ -1507,6 +1510,66 @@ function getIntegrationAuthContext(req) {
     const token = authHeader.startsWith('Bearer ') ? authHeader.slice(7).trim() : '';
     const storeId = typeof req.query.storeId === 'string' ? req.query.storeId.trim() : '';
     return { token, storeId };
+}
+function getPromoSlugFromRequest(req) {
+    if (typeof req.query.slug !== 'string') {
+        return '';
+    }
+    return req.query.slug
+        .trim()
+        .toLowerCase()
+        .replace(/[^a-z0-9-]/g, '-')
+        .replace(/-{2,}/g, '-')
+        .replace(/^-|-$/g, '');
+}
+function toTrimmedStringOrNull(value) {
+    if (typeof value !== 'string') {
+        return null;
+    }
+    const trimmed = value.trim();
+    return trimmed ? trimmed : null;
+}
+async function resolvePromoStoreForRead(req, res) {
+    if (req.method !== 'GET') {
+        res.status(405).json({ error: 'method-not-allowed' });
+        return null;
+    }
+    const { token, storeId } = getIntegrationAuthContext(req);
+    if (token || storeId) {
+        const authContext = await validateIntegrationTokenOrReply(req, res);
+        if (!authContext) {
+            return null;
+        }
+        const storeSnap = await firestore_1.defaultDb.collection('stores').doc(authContext.storeId).get();
+        if (!storeSnap.exists) {
+            res.status(404).json({ error: 'store-not-found' });
+            return null;
+        }
+        return {
+            storeId: authContext.storeId,
+            data: (storeSnap.data() ?? {}),
+        };
+    }
+    const promoSlug = getPromoSlugFromRequest(req);
+    if (!promoSlug) {
+        res.status(400).json({ error: 'missing-promo-slug' });
+        return null;
+    }
+    const storeBySlug = await firestore_1.defaultDb
+        .collection('stores')
+        .where('promoSlug', '==', promoSlug)
+        .where('promoEnabled', '==', true)
+        .limit(1)
+        .get();
+    if (storeBySlug.empty) {
+        res.status(404).json({ error: 'promo-not-found' });
+        return null;
+    }
+    const matchedStoreDoc = storeBySlug.docs[0];
+    return {
+        storeId: matchedStoreDoc.id,
+        data: (matchedStoreDoc.data() ?? {}),
+    };
 }
 function normalizeTimestampIso(value) {
     if (value instanceof firestore_1.admin.firestore.Timestamp) {
@@ -1615,43 +1678,43 @@ exports.integrationProducts = functions.https.onRequest(async (req, res) => {
 });
 exports.integrationPromo = functions.https.onRequest(async (req, res) => {
     setIntegrationResponseHeaders(res);
-    const authContext = await validateIntegrationTokenOrReply(req, res);
-    if (!authContext) {
+    if (req.method === 'OPTIONS') {
+        res.status(204).send('');
         return;
     }
-    const { storeId } = authContext;
-    const storeSnap = await firestore_1.defaultDb.collection('stores').doc(storeId).get();
-    if (!storeSnap.exists) {
-        res.status(404).json({ error: 'store-not-found' });
+    const storeContext = await resolvePromoStoreForRead(req, res);
+    if (!storeContext) {
         return;
     }
-    const data = (storeSnap.data() ?? {});
+    const { storeId, data } = storeContext;
     res.status(200).json({
         storeId,
         promo: {
             enabled: data.promoEnabled === true,
-            slug: typeof data.promoSlug === 'string' && data.promoSlug.trim() ? data.promoSlug.trim() : null,
-            title: typeof data.promoTitle === 'string' && data.promoTitle.trim() ? data.promoTitle.trim() : null,
-            summary: typeof data.promoSummary === 'string' && data.promoSummary.trim() ? data.promoSummary.trim() : null,
-            startDate: typeof data.promoStartDate === 'string' && data.promoStartDate.trim()
-                ? data.promoStartDate.trim()
-                : null,
-            endDate: typeof data.promoEndDate === 'string' && data.promoEndDate.trim() ? data.promoEndDate.trim() : null,
-            websiteUrl: typeof data.promoWebsiteUrl === 'string' && data.promoWebsiteUrl.trim()
-                ? data.promoWebsiteUrl.trim()
-                : null,
-            storeName: typeof data.name === 'string' && data.name.trim() ? data.name.trim() : 'Sedifex Store',
+            slug: toTrimmedStringOrNull(data.promoSlug),
+            title: toTrimmedStringOrNull(data.promoTitle),
+            summary: toTrimmedStringOrNull(data.promoSummary),
+            startDate: toTrimmedStringOrNull(data.promoStartDate),
+            endDate: toTrimmedStringOrNull(data.promoEndDate),
+            websiteUrl: toTrimmedStringOrNull(data.promoWebsiteUrl),
+            imageUrl: toTrimmedStringOrNull(data.promoImageUrl),
+            imageAlt: toTrimmedStringOrNull(data.promoImageAlt),
+            storeName: toTrimmedStringOrNull(data.displayName) ?? toTrimmedStringOrNull(data.name) ?? 'Sedifex Store',
             updatedAt: normalizeTimestampIso(data.updatedAt),
         },
     });
 });
 exports.integrationGallery = functions.https.onRequest(async (req, res) => {
     setIntegrationResponseHeaders(res);
-    const authContext = await validateIntegrationTokenOrReply(req, res);
-    if (!authContext) {
+    if (req.method === 'OPTIONS') {
+        res.status(204).send('');
         return;
     }
-    const { storeId } = authContext;
+    const storeContext = await resolvePromoStoreForRead(req, res);
+    if (!storeContext) {
+        return;
+    }
+    const { storeId } = storeContext;
     const gallerySnapshot = await firestore_1.defaultDb
         .collection('stores')
         .doc(storeId)

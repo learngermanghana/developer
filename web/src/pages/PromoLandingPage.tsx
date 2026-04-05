@@ -1,8 +1,6 @@
 import React, { useEffect, useState } from 'react'
-import { collection, getDocs, limit, orderBy, query, where } from 'firebase/firestore'
 import { Link, useParams } from 'react-router-dom'
 
-import { db } from '../firebase'
 import './PromoLandingPage.css'
 
 type PromoProfile = {
@@ -25,6 +23,33 @@ type PromoGalleryItem = {
   sortOrder: number
 }
 
+type PromoApiResponse = {
+  promo?: {
+    enabled?: boolean
+    slug?: string | null
+    title?: string | null
+    summary?: string | null
+    startDate?: string | null
+    endDate?: string | null
+    websiteUrl?: string | null
+    imageUrl?: string | null
+    imageAlt?: string | null
+    storeName?: string | null
+  }
+  storeId?: string
+}
+
+type PromoGalleryApiResponse = {
+  gallery?: Array<{
+    id?: string
+    url?: string
+    alt?: string | null
+    caption?: string | null
+    sortOrder?: number
+    isPublished?: boolean
+  }>
+}
+
 function normalizeSlug(value: string): string {
   return value
     .trim()
@@ -45,6 +70,15 @@ function sanitizeSummary(value: string | null, storeName: string): string {
   }
 
   return compact
+}
+
+function getIntegrationEndpoint(path: string): string {
+  const functionsRegion = import.meta.env.VITE_FB_FUNCTIONS_REGION ?? 'us-central1'
+  const projectId = import.meta.env.VITE_FB_PROJECT_ID
+  if (!projectId) {
+    throw new Error('Missing Firebase project configuration for promo endpoint')
+  }
+  return `https://${functionsRegion}-${projectId}.cloudfunctions.net/${path}`
 }
 
 export default function PromoLandingPage() {
@@ -71,59 +105,76 @@ export default function PromoLandingPage() {
       try {
         setLoading(true)
         setError(null)
+        const promoUrl = `${getIntegrationEndpoint('integrationPromo')}?slug=${encodeURIComponent(
+          normalizedSlug,
+        )}`
+        const galleryUrl = `${getIntegrationEndpoint('integrationGallery')}?slug=${encodeURIComponent(
+          normalizedSlug,
+        )}`
 
-        const storesQuery = query(
-          collection(db, 'stores'),
-          where('promoSlug', '==', normalizedSlug),
-          limit(1),
-        )
-        const snapshot = await getDocs(storesQuery)
+        const [promoResponse, galleryResponse] = await Promise.all([
+          fetch(promoUrl, { method: 'GET' }),
+          fetch(galleryUrl, { method: 'GET' }),
+        ])
 
-        if (!isMounted) return
-        if (snapshot.empty) {
+        if (!promoResponse.ok) {
+          if (promoResponse.status === 404) {
+            setProfile(null)
+            setGallery([])
+            setError('Promo not found.')
+            return
+          }
+          throw new Error(`Promo fetch failed with ${promoResponse.status}`)
+        }
+        if (!galleryResponse.ok) {
+          throw new Error(`Gallery fetch failed with ${galleryResponse.status}`)
+        }
+
+        const promoPayload = (await promoResponse.json()) as PromoApiResponse
+        const galleryPayload = (await galleryResponse.json()) as PromoGalleryApiResponse
+        const promo = promoPayload.promo
+        const storeId = typeof promoPayload.storeId === 'string' ? promoPayload.storeId : ''
+        if (!promo || !storeId || promo.enabled !== true) {
           setProfile(null)
-          setError('Promo not found.')
+          setGallery([])
+          setError('This promo link is not active.')
           return
         }
 
-        const storeDoc = snapshot.docs[0]
-        const data = storeDoc.data() as Record<string, unknown>
-        const galleryRef = collection(db, 'stores', storeDoc.id, 'promoGallery')
-        const gallerySnapshot = await getDocs(query(galleryRef, orderBy('sortOrder', 'asc'), limit(36)))
-
-        const publishedGallery = gallerySnapshot.docs
-          .map(itemDoc => {
-            const itemData = itemDoc.data() as Record<string, unknown>
-            if (itemData.isPublished !== true || typeof itemData.url !== 'string' || !itemData.url.trim()) {
+        const publishedGallery = (galleryPayload.gallery ?? [])
+          .map(item => {
+            const id = typeof item.id === 'string' ? item.id : ''
+            const url = typeof item.url === 'string' ? item.url.trim() : ''
+            if (!id || !url) {
               return null
             }
             return {
-              id: itemDoc.id,
-              url: itemData.url.trim(),
-              alt:
-                typeof itemData.alt === 'string' && itemData.alt.trim() ? itemData.alt.trim() : null,
+              id,
+              url,
+              alt: typeof item.alt === 'string' && item.alt.trim() ? item.alt.trim() : null,
               caption:
-                typeof itemData.caption === 'string' && itemData.caption.trim()
-                  ? itemData.caption.trim()
-                  : null,
-              sortOrder: typeof itemData.sortOrder === 'number' ? itemData.sortOrder : 0,
+                typeof item.caption === 'string' && item.caption.trim() ? item.caption.trim() : null,
+              sortOrder: typeof item.sortOrder === 'number' ? item.sortOrder : 0,
             } satisfies PromoGalleryItem
           })
           .filter((item): item is PromoGalleryItem => item !== null)
+          .sort((a, b) => a.sortOrder - b.sortOrder)
+
+        if (!isMounted) return
 
         setProfile({
-          storeId: storeDoc.id,
+          storeId,
           storeName:
-            (typeof data.displayName === 'string' && data.displayName.trim()) ||
-            (typeof data.name === 'string' && data.name.trim()) ||
-            'Sedifex Store',
-          title: typeof data.promoTitle === 'string' ? data.promoTitle : null,
-          summary: typeof data.promoSummary === 'string' ? data.promoSummary : null,
-          startDate: typeof data.promoStartDate === 'string' ? data.promoStartDate : null,
-          endDate: typeof data.promoEndDate === 'string' ? data.promoEndDate : null,
-          websiteUrl: typeof data.promoWebsiteUrl === 'string' ? data.promoWebsiteUrl : null,
-          imageUrl: typeof data.promoImageUrl === 'string' ? data.promoImageUrl : null,
-          imageAlt: typeof data.promoImageAlt === 'string' ? data.promoImageAlt : null,
+            typeof promo.storeName === 'string' && promo.storeName.trim()
+              ? promo.storeName.trim()
+              : 'Sedifex Store',
+          title: typeof promo.title === 'string' ? promo.title : null,
+          summary: typeof promo.summary === 'string' ? promo.summary : null,
+          startDate: typeof promo.startDate === 'string' ? promo.startDate : null,
+          endDate: typeof promo.endDate === 'string' ? promo.endDate : null,
+          websiteUrl: typeof promo.websiteUrl === 'string' ? promo.websiteUrl : null,
+          imageUrl: typeof promo.imageUrl === 'string' ? promo.imageUrl : null,
+          imageAlt: typeof promo.imageAlt === 'string' ? promo.imageAlt : null,
         })
         setGallery(publishedGallery)
       } catch (nextError) {
@@ -179,36 +230,33 @@ export default function PromoLandingPage() {
       </nav>
       <article className="promo-card">
         <section id="promo-hero" className="promo-section">
-        <p className="promo-label">Sedifex promo</p>
-        {profile.imageUrl ? (
-          <img
-            className="promo-image"
-            src={profile.imageUrl}
-            alt={profile.imageAlt || `${profile.storeName} promo image`}
-            loading="lazy"
-          />
-        ) : null}
-        <h1>{profile.title || `Special offers at ${profile.storeName}`}</h1>
-        <p className="promo-store">Store: {profile.storeName}</p>
-        <p className="promo-summary">
-          {profile.summary ||
-            `Discover limited-time beauty and wellness deals from ${profile.storeName}. Book now and enjoy premium care for less.`}
-        </p>
-        {(profile.startDate || profile.endDate) && (
-          <p className="promo-dates">
-            Offer window: {profile.startDate || 'Now'} – {profile.endDate || 'Limited time'}
-          </p>
-        )}
-        {profile.websiteUrl ? (
-          <a
-            className="promo-cta"
-            href={profile.websiteUrl}
-            target="_blank"
-            rel="noreferrer noopener"
-          >
-            Shop now
-          </a>
-        ) : null}
+          <p className="promo-label">Sedifex promo</p>
+          {profile.imageUrl ? (
+            <img
+              className="promo-image"
+              src={profile.imageUrl}
+              alt={profile.imageAlt || `${profile.storeName} promo image`}
+              loading="lazy"
+            />
+          ) : null}
+          <h1>{promoTitle}</h1>
+          <p className="promo-store">Store: {profile.storeName}</p>
+          <p className="promo-summary">{promoSummary}</p>
+          {(profile.startDate || profile.endDate) && (
+            <p className="promo-dates">
+              Offer window: {profile.startDate || 'Now'} – {profile.endDate || 'Limited time'}
+            </p>
+          )}
+          {profile.websiteUrl ? (
+            <a
+              className="promo-cta"
+              href={profile.websiteUrl}
+              target="_blank"
+              rel="noreferrer noopener"
+            >
+              Shop now
+            </a>
+          ) : null}
         </section>
         <section id="promo-gallery" className="promo-section">
           <div className="promo-gallery-header">
