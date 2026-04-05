@@ -1430,7 +1430,9 @@ export default function Sell() {
     const totals = { subTotal, taxTotal: effectiveTaxTotal, discount: discountAmount, total: totalAfterDiscount }
 
     const amountPaidValue = hasExplicitPaymentInput ? totalAmountPaid : totalAfterDiscount
-    const changeDueValue = Math.max(0, amountPaidValue - totalAfterDiscount)
+    const changeDueValue = hasExplicitPaymentInput
+      ? Math.abs(amountPaidValue - totalAfterDiscount)
+      : Math.max(0, amountPaidValue - totalAfterDiscount)
 
     const parsedAdditionalTenders: ReceiptTender[] = additionalTenders
       .map(t => ({ method: t.method, amount: Number(t.amount) }))
