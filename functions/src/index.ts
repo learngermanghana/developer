@@ -2649,13 +2649,13 @@ const SEDIFEX_API_BASE_URL = defineString('SEDIFEX_API_BASE_URL')
 const PAYSTACK_STANDARD_PLAN_CODE = defineString('PAYSTACK_STANDARD_PLAN_CODE')
 
 // New: map frontend plan keys -> Paystack plan codes (optional).
-const PAYSTACK_STARTER_MONTHLY_PLAN_CODE = defineString('PAYSTACK_STARTER_MONTHLY_PLAN_CODE')
-const PAYSTACK_STARTER_BIANNUAL_PLAN_CODE = defineString('PAYSTACK_STARTER_BIANNUAL_PLAN_CODE')
-const PAYSTACK_STARTER_YEARLY_PLAN_CODE = defineString('PAYSTACK_STARTER_YEARLY_PLAN_CODE')
+const PAYSTACK_STARTER_PLAN_CODE = defineString('PAYSTACK_STARTER_PLAN_CODE')
+const PAYSTACK_GROWTH_PLAN_CODE = defineString('PAYSTACK_GROWTH_PLAN_CODE')
+const PAYSTACK_SCALE_PLAN_CODE = defineString('PAYSTACK_SCALE_PLAN_CODE')
 
 const PAYSTACK_CURRENCY = defineString('PAYSTACK_CURRENCY')
 
-type PaystackPlanKey = 'starter-monthly' | 'starter-biannual' | 'starter-yearly' | string
+type PaystackPlanKey = 'starter' | 'growth' | 'scale' | string
 
 // Fixed packages (GHS)
 const BULK_CREDITS_PACKAGES: Record<string, { credits: number; amount: number }> = {
@@ -2670,19 +2670,18 @@ function getPaystackConfig() {
   const publicKey = PAYSTACK_PUBLIC_KEY.value()
   const currency = PAYSTACK_CURRENCY.value() || 'GHS'
 
-  const starterMonthly =
-    PAYSTACK_STARTER_MONTHLY_PLAN_CODE.value() || PAYSTACK_STANDARD_PLAN_CODE.value()
-  const starterBiannual = PAYSTACK_STARTER_BIANNUAL_PLAN_CODE.value()
-  const starterYearly = PAYSTACK_STARTER_YEARLY_PLAN_CODE.value()
+  const starterPlan = PAYSTACK_STARTER_PLAN_CODE.value() || PAYSTACK_STANDARD_PLAN_CODE.value()
+  const growthPlan = PAYSTACK_GROWTH_PLAN_CODE.value()
+  const scalePlan = PAYSTACK_SCALE_PLAN_CODE.value()
 
   if (!paystackConfigLogged) {
     console.log('[paystack] startup config', {
       hasSecret: !!secret,
       hasPublicKey: !!publicKey,
       currency,
-      hasStarterMonthlyPlan: !!starterMonthly,
-      hasStarterBiannualPlan: !!starterBiannual,
-      hasStarterYearlyPlan: !!starterYearly,
+      hasStarterPlan: !!starterPlan,
+      hasGrowthPlan: !!growthPlan,
+      hasScalePlan: !!scalePlan,
     })
     paystackConfigLogged = true
   }
@@ -2692,9 +2691,9 @@ function getPaystackConfig() {
     publicKey,
     currency,
     plans: {
-      'starter-monthly': starterMonthly,
-      'starter-biannual': starterBiannual,
-      'starter-yearly': starterYearly,
+      starter: starterPlan,
+      growth: growthPlan,
+      scale: scalePlan,
     } as Record<string, string | undefined>,
   }
 }
@@ -2732,27 +2731,16 @@ function resolveBulkCreditsPackage(raw: unknown): string | null {
   return BULK_CREDITS_PACKAGES[trimmed] ? trimmed : null
 }
 
-function resolvePlanMonths(planKey: string | null): number {
-  if (!planKey) return 1
-  const lower = planKey.toLowerCase()
-  if (lower.includes('year')) return 12
-  if (lower.includes('annual')) return 12
-  if (lower.includes('biannual')) return 6
-  if (lower.includes('semiannual')) return 6
-  if (lower.includes('semi-annual')) return 6
-  if (lower.includes('month')) return 1
+function resolvePlanMonths(_planKey: string | null): number {
   return 1
 }
 
 function resolvePlanDefaultAmount(planKey: string | null): number {
-  if (!planKey) return 100
+  if (!planKey) return 20
   const lower = planKey.toLowerCase()
-  if (lower.includes('year')) return 1100
-  if (lower.includes('annual')) return 1100
-  if (lower.includes('biannual')) return 600
-  if (lower.includes('semiannual')) return 600
-  if (lower.includes('semi-annual')) return 600
-  return 100
+  if (lower.includes('scale')) return 100
+  if (lower.includes('growth')) return 50
+  return 20
 }
 
 function addMonths(base: Date, months: number) {
@@ -2823,7 +2811,7 @@ export const createPaystackCheckout = functions.https.onCall(
       resolvePlanKey(payload.plan) ||
       resolvePlanKey(payload.planId) ||
       resolvePlanKey((payload as any).planKey) ||
-      'starter-monthly'
+      'starter'
 
     const amountInput = Number((payload as any).amount)
     const amountGhs =
@@ -3406,7 +3394,7 @@ export const handlePaystackWebhook = functions.https.onRequest(async (req, res) 
               resolvePlanKey(metadata.planKey) ||
               resolvePlanKey(metadata.plan) ||
               resolvePlanKey(metadata.planId) ||
-              'starter-monthly',
+              'starter',
             status: 'active',
             currency: paystackConfig.currency,
             paystackCustomerCode: customer.customer_code || null,
@@ -3465,7 +3453,7 @@ export const handlePaystackWebhook = functions.https.onRequest(async (req, res) 
             resolvePlanKey(metadata.planKey) ||
             resolvePlanKey(metadata.plan) ||
             resolvePlanKey(metadata.planId) ||
-            'starter-monthly',
+            'starter',
           reference: data.reference || null,
           amount: typeof data.amount === 'number' ? data.amount / 100 : null,
           currency: paystackConfig.currency,

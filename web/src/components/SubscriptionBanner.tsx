@@ -66,7 +66,7 @@ export function SubscriptionBanner({ subscription }: SubscriptionBannerProps) {
             'Manage your plan at sedifex.com to unlock full features.'
           ) : (
             <>
-              Subscribe for <strong>$10/month</strong> to keep unlimited sales and inventory.
+              Upgrade to Starter, Growth, or Scale to increase your product and daily sales limits.
             </>
           )}
         </div>
