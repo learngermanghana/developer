@@ -1,5 +1,5 @@
 import React, { useState } from 'react'
-import { cancelPaystackSubscription, startPaystackCheckout } from '../lib/paystackClient'
+import { startPaystackCheckout } from '../lib/paystackClient'
 import { usePwaContext } from '../context/PwaContext'
 
 type Props = {
@@ -15,15 +15,22 @@ type Props = {
 type PlanOption = {
   id: string
   label: string
-  amountGhs: number
+  monthlyAmountGhs: number
   productLimit: number
   dailySalesLimit: number
 }
 
 const PLANS: PlanOption[] = [
-  { id: 'starter', label: 'Starter', amountGhs: 20, productLimit: 100, dailySalesLimit: 100 },
-  { id: 'growth', label: 'Growth', amountGhs: 50, productLimit: 500, dailySalesLimit: 500 },
-  { id: 'scale', label: 'Scale', amountGhs: 100, productLimit: 2000, dailySalesLimit: 2000 },
+  { id: 'starter', label: 'Starter', monthlyAmountGhs: 20, productLimit: 100, dailySalesLimit: 100 },
+  { id: 'growth', label: 'Growth', monthlyAmountGhs: 50, productLimit: 500, dailySalesLimit: 500 },
+  { id: 'scale', label: 'Scale', monthlyAmountGhs: 100, productLimit: 2000, dailySalesLimit: 2000 },
+]
+
+const CADENCE_OPTIONS = [
+  { months: 1, label: '1 month' },
+  { months: 3, label: '3 months' },
+  { months: 6, label: '6 months' },
+  { months: 12, label: '12 months' },
 ]
 
 export const AccountBillingSection: React.FC<Props> = ({
@@ -38,19 +45,19 @@ export const AccountBillingSection: React.FC<Props> = ({
   const { isPwaApp } = usePwaContext()
   const defaultPlanId = PLANS[0]?.id ?? ''
   const [selectedPlanId, setSelectedPlanId] = useState<string>(defaultPlanId)
+  const [selectedMonths, setSelectedMonths] = useState<number>(12)
   const [loading, setLoading] = useState(false)
-  const [cancelLoading, setCancelLoading] = useState(false)
-  const [cancelConfirming, setCancelConfirming] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [cancelSuccess, setCancelSuccess] = useState(false)
 
   const selectedPlan = PLANS.find(plan => plan.id === selectedPlanId) ?? null
-  const selectedCadenceLabel = 'Monthly'
-  const selectedCadenceDescription = 'Billed every month.'
+  const selectedCadence = CADENCE_OPTIONS.find(option => option.months === selectedMonths)
+  const selectedCadenceLabel = selectedCadence?.label ?? `${selectedMonths} months`
+  const selectedCadenceDescription = 'Fixed contract. No automatic recurring charge.'
+  const selectedAmount = selectedPlan ? selectedPlan.monthlyAmountGhs * selectedMonths : null
   const nextChargeDate = (() => {
     const base = new Date()
     const nextDate = new Date(base)
-    nextDate.setMonth(base.getMonth() + 1)
+    nextDate.setMonth(base.getMonth() + selectedMonths)
     return nextDate
   })()
   const nextChargeDisplay = nextChargeDate.toLocaleDateString(undefined, {
@@ -98,8 +105,9 @@ export const AccountBillingSection: React.FC<Props> = ({
       const response = await startPaystackCheckout({
         email: ownerEmail,
         storeId,
-        amount: targetPlan.amountGhs,
+        amount: targetPlan.monthlyAmountGhs * selectedMonths,
         plan: targetPlan.id,
+        contractMonths: selectedMonths,
         redirectUrl,
         metadata: {
           source: 'account-contract-billing',
@@ -125,40 +133,6 @@ export const AccountBillingSection: React.FC<Props> = ({
   const handleStartCheckout = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault()
     await startCheckoutForPlan(selectedPlanId)
-  }
-
-  const beginCancelSubscription = () => {
-    setError(null)
-    setCancelSuccess(false)
-
-    if (!storeId) {
-      setError('Missing store ID. Please refresh and try again.')
-      return
-    }
-
-    setCancelConfirming(true)
-  }
-
-  const handleCancelSubscription = async () => {
-    setError(null)
-
-    try {
-      setCancelLoading(true)
-      const response = await cancelPaystackSubscription(storeId)
-      if (!response.ok) {
-        setError('Unable to cancel your subscription. Please try again.')
-        return
-      }
-      setCancelSuccess(true)
-      setCancelConfirming(false)
-    } catch (err) {
-      console.error('Cancel subscription error', err)
-      const message =
-        err instanceof Error ? err.message : 'Something went wrong canceling the subscription.'
-      setError(message)
-    } finally {
-      setCancelLoading(false)
-    }
   }
 
   if (isPwaApp) {
@@ -243,44 +217,11 @@ export const AccountBillingSection: React.FC<Props> = ({
             </p>
 
             <div className="rounded border border-gray-200 bg-white p-3 space-y-2">
-              <p className="text-sm font-medium text-gray-900">Cancel your subscription</p>
+              <p className="text-sm font-medium text-gray-900">Contract billing</p>
               <p className="text-xs text-gray-600">
-                Cancelling stops future Paystack charges for this workspace.
+                This workspace uses fixed-term contracts (no automatic recurring card charge). When
+                the contract expires, renew with a new payment to keep premium access.
               </p>
-              {!cancelConfirming ? (
-                <button
-                  type="button"
-                  className="button button--secondary"
-                  onClick={beginCancelSubscription}
-                  disabled={cancelLoading}
-                >
-                  {cancelLoading ? 'Canceling…' : 'Cancel subscription'}
-                </button>
-              ) : (
-                <div className="flex flex-wrap items-center gap-2">
-                  <button
-                    type="button"
-                    className="button button--secondary"
-                    onClick={handleCancelSubscription}
-                    disabled={cancelLoading}
-                  >
-                    {cancelLoading ? 'Canceling…' : 'Yes, cancel now'}
-                  </button>
-                  <button
-                    type="button"
-                    className="button button--ghost"
-                    onClick={() => setCancelConfirming(false)}
-                    disabled={cancelLoading}
-                  >
-                    Keep subscription
-                  </button>
-                </div>
-              )}
-              {cancelSuccess && (
-                <p className="text-xs text-green-700">
-                  Subscription canceled. Paystack will not charge you again.
-                </p>
-              )}
             </div>
           </div>
         </div>
@@ -297,8 +238,8 @@ export const AccountBillingSection: React.FC<Props> = ({
             </div>
           )}
           <p className="text-sm text-gray-600 mb-4">
-            Choose a plan and start your subscription. You’ll be redirected to Paystack to complete
-            the payment.
+            Choose a plan and contract term. You’ll be redirected to Paystack where clients can pay
+            with supported methods like mobile money.
           </p>
 
           <form
@@ -318,7 +259,22 @@ export const AccountBillingSection: React.FC<Props> = ({
                 >
                   {PLANS.map(plan => (
                     <option key={plan.id} value={plan.id}>
-                      {plan.label} – GHS {plan.amountGhs.toFixed(2)}
+                      {plan.label} – GHS {plan.monthlyAmountGhs.toFixed(2)}/month
+                    </option>
+                  ))}
+                </select>
+              </label>
+
+              <label className="block text-sm font-medium">
+                <span>Contract term</span>
+                <select
+                  value={String(selectedMonths)}
+                  onChange={event => setSelectedMonths(Number(event.target.value))}
+                  className="border rounded px-3 py-2 w-full"
+                >
+                  {CADENCE_OPTIONS.map(option => (
+                    <option key={option.months} value={option.months}>
+                      {option.label}
                     </option>
                   ))}
                 </select>
@@ -329,7 +285,7 @@ export const AccountBillingSection: React.FC<Props> = ({
                 <p>
                   Price:{' '}
                   <strong>
-                    GHS {selectedPlan?.amountGhs.toFixed(2) ?? '—'}
+                    GHS {selectedAmount?.toFixed(2) ?? '—'}
                   </strong>{' '}
                   ({selectedCadenceLabel})
                 </p>
@@ -339,11 +295,15 @@ export const AccountBillingSection: React.FC<Props> = ({
                   {selectedPlan?.dailySalesLimit ?? '—'} sales/day.
                 </p>
                 <p>
-                  Renews automatically every month.
+                  Contract-based access: when your term ends without payment, this workspace is
+                  downgraded until renewed.
                 </p>
                 <p>
-                  Estimated next charge:{' '}
-                  <strong>{nextChargeDisplay}</strong> (once your subscription starts).
+                  Contract end (if paid now): <strong>{nextChargeDisplay}</strong>.
+                </p>
+                <p>
+                  Upgrading before your current contract ends automatically applies remaining credit
+                  to the new plan charge.
                 </p>
               </div>
 
