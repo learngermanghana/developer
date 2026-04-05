@@ -150,6 +150,18 @@ body.shell--menu-open {
   flex-grow: 1;
 }
 
+.shell__nav-item-group {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.shell__subnav {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
 .shell__nav-group {
   display: flex;
   align-items: center;
@@ -454,6 +466,20 @@ body.shell--menu-open {
     align-items: stretch;
     width: 100%;
     gap: 12px;
+  }
+
+  .shell__nav-item-group {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 8px;
+    width: 100%;
+  }
+
+  .shell__subnav {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 8px;
+    width: 100%;
   }
 
   .shell__nav-group {

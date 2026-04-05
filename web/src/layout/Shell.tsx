@@ -124,6 +124,17 @@ export default function Shell({ children }: { children: React.ReactNode }) {
     return NAV_ITEMS.filter(item => item.roles.includes(role))
   }, [hasTrialEnded, role])
 
+  const navTree = useMemo(
+    () =>
+      navItems
+        .filter(item => !item.parentTo)
+        .map(item => ({
+          item,
+          children: navItems.filter(child => child.parentTo === item.to),
+        })),
+    [navItems],
+  )
+
   const billingNotice = useMemo<BillingNotice | null>(() => {
     if (!billing) return null
 
