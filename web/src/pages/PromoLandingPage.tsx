@@ -99,8 +99,6 @@ type CatalogApiResponse = {
   }>
 }
 
-type PromoSectionTab = 'about' | 'promo' | 'gallery' | 'catalog'
-
 function normalizeSlug(value: string): string {
   return value
     .trim()
@@ -184,7 +182,6 @@ export default function PromoLandingPage() {
   const [error, setError] = useState<string | null>(null)
   const [gallery, setGallery] = useState<PromoGalleryItem[]>([])
   const [catalogItems, setCatalogItems] = useState<CatalogItem[]>([])
-  const [activeTab, setActiveTab] = useState<PromoSectionTab>('about')
   const [activeGalleryImageId, setActiveGalleryImageId] = useState<string | null>(null)
 
   const activeGalleryIndex = useMemo(() => {
@@ -361,7 +358,6 @@ export default function PromoLandingPage() {
         })
         setGallery(publishedGallery)
         setCatalogItems(catalog)
-        setActiveTab('about')
       } catch (nextError) {
         console.error('[promo] Failed to load promo page', nextError)
         if (isMounted) {
@@ -492,50 +488,38 @@ export default function PromoLandingPage() {
   const primaryPromoVideoEmbedUrl = profile.youtubeVideos[0]?.embedUrl ?? profile.youtubeEmbedUrl
   return (
     <main className="promo-page">
-      <nav className="promo-nav" aria-label="Promo sections">
-        <button
-          type="button"
-          className={`promo-nav__button ${activeTab === 'about' ? 'is-active' : ''}`}
-          onClick={() => setActiveTab('about')}
-        >
-          About
-        </button>
-        <button
-          type="button"
-          className={`promo-nav__button ${activeTab === 'promo' ? 'is-active' : ''}`}
-          onClick={() => setActiveTab('promo')}
-        >
-          Promo
-        </button>
-        <button
-          type="button"
-          className={`promo-nav__button ${activeTab === 'gallery' ? 'is-active' : ''}`}
-          onClick={() => setActiveTab('gallery')}
-        >
-          Gallery
-        </button>
-        <button
-          type="button"
-          className={`promo-nav__button ${activeTab === 'catalog' ? 'is-active' : ''}`}
-          onClick={() => setActiveTab('catalog')}
-        >
-          Products & services
-        </button>
-      </nav>
       <article className="promo-card">
-        {activeTab === 'about' && (
-        <section id="promo-about" className="promo-section">
-          <p className="promo-label">About this page</p>
+        <header className="promo-site-header">
+          <p className="promo-label">Sedifex store page</p>
           <h1>{profile.storeName}</h1>
+          <p className="promo-summary">
+            Everything we have publicly available for {profile.storeName} is arranged below like a full
+            webpage: promo details, latest gallery updates, and products/services.
+          </p>
+          <nav className="promo-nav" aria-label="Promo sections">
+            <a className="promo-nav__button" href="#promo-about">
+              About
+            </a>
+            <a className="promo-nav__button" href="#promo-hero">
+              Promo
+            </a>
+            <a className="promo-nav__button" href="#promo-gallery">
+              Gallery
+            </a>
+            <a className="promo-nav__button" href="#promo-catalog">
+              Products & services
+            </a>
+          </nav>
+        </header>
+        <section id="promo-about" className="promo-section promo-section--panel">
+          <p className="promo-label">About this page</p>
           <p className="promo-summary">
             This public Sedifex page helps {profile.storeName} get SEO presence with a free URL.
             Promo updates, gallery images, and available products/services are organized here
             automatically.
           </p>
         </section>
-        )}
-        {activeTab === 'promo' && (
-        <section id="promo-hero" className="promo-section">
+        <section id="promo-hero" className="promo-section promo-section--panel">
           <p className="promo-label">Sedifex promo</p>
           {!profile.promoEnabled ? (
             <p className="promo-meta">No active promo is running right now. Check back soon.</p>
@@ -614,9 +598,7 @@ export default function PromoLandingPage() {
             </a>
           ) : null}
         </section>
-        )}
-        {activeTab === 'gallery' && (
-        <section id="promo-gallery" className="promo-section">
+        <section id="promo-gallery" className="promo-section promo-section--panel">
           <div className="promo-gallery-header">
             <h2>Gallery</h2>
             <p>Latest highlights from {profile.storeName}.</p>
@@ -645,7 +627,6 @@ export default function PromoLandingPage() {
             <p className="promo-gallery-empty">Gallery updates will appear here soon.</p>
           )}
         </section>
-        )}
         {activeGalleryItem ? (
           <div
             className="promo-gallery-viewer"
@@ -689,8 +670,7 @@ export default function PromoLandingPage() {
             </div>
           </div>
         ) : null}
-        {activeTab === 'catalog' && (
-          <section id="promo-catalog" className="promo-section">
+        <section id="promo-catalog" className="promo-section promo-section--panel">
             <div className="promo-gallery-header">
               <h2>Products & services</h2>
               <p>Available offerings from {profile.storeName}.</p>
@@ -722,8 +702,7 @@ export default function PromoLandingPage() {
             ) : (
               <p className="promo-gallery-empty">Products and services will appear here soon.</p>
             )}
-          </section>
-        )}
+        </section>
       </article>
     </main>
   )
