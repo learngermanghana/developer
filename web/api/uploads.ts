@@ -168,8 +168,46 @@ function toBufferPayload(value: unknown): Buffer | null {
   if (!value) return null
   if (value instanceof Buffer) return value
   if (value instanceof Uint8Array) return Buffer.from(value)
+  if (value instanceof ArrayBuffer) return Buffer.from(value)
+  if (typeof value === 'object' && value !== null) {
+    const maybeNodeBufferShape = value as { type?: unknown; data?: unknown }
+    if (
+      maybeNodeBufferShape.type === 'Buffer' &&
+      Array.isArray(maybeNodeBufferShape.data) &&
+      maybeNodeBufferShape.data.every(item => typeof item === 'number')
+    ) {
+      return Buffer.from(maybeNodeBufferShape.data)
+    }
+  }
   if (typeof value === 'string') return Buffer.from(value, 'binary')
   return null
+}
+
+async function readBinaryBodyFromStream(req: VercelRequest): Promise<Buffer | null> {
+  const streamReq = req as unknown as NodeJS.ReadableStream & { readableEnded?: boolean }
+  if (!streamReq || typeof streamReq.on !== 'function') return null
+  if (streamReq.readableEnded) return null
+
+  const chunks: Buffer[] = []
+  return new Promise(resolve => {
+    let settled = false
+
+    const finalize = (buffer: Buffer | null) => {
+      if (settled) return
+      settled = true
+      resolve(buffer)
+    }
+
+    streamReq.on('data', chunk => {
+      const bufferChunk = toBufferPayload(chunk)
+      if (bufferChunk && bufferChunk.length) chunks.push(bufferChunk)
+    })
+    streamReq.on('end', () => {
+      if (!chunks.length) return finalize(null)
+      finalize(Buffer.concat(chunks))
+    })
+    streamReq.on('error', () => finalize(null))
+  })
 }
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
@@ -243,7 +281,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     filename = readHeaderString(req.headers?.['x-upload-filename']) || 'upload'
     mimeType = readHeaderString(req.headers?.['x-upload-mimetype']) || req.headers?.['content-type'] || ''
     storagePath = readHeaderString(req.headers?.['x-upload-storage-path'])
-    const binaryPayload = toBufferPayload(req.body)
+    const binaryPayload =
+      toBufferPayload(req.body) ||
+      toBufferPayload((req as unknown as { rawBody?: unknown }).rawBody) ||
+      (await readBinaryBodyFromStream(req))
     if (!binaryPayload) {
       return res.status(400).json({ error: 'Binary image payload is empty.' })
     }
