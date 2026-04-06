@@ -53,6 +53,9 @@ describe('uploads api', () => {
   it('uses provided storagePath so uploads overwrite the same object path', async () => {
     const req = {
       method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+      },
       body: {
         filename: 'promo.png',
         mimeType: 'image/png',
@@ -83,6 +86,9 @@ describe('uploads api', () => {
   it('creates a timestamped object path when no storagePath is provided', async () => {
     const req = {
       method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+      },
       body: {
         filename: 'gallery.png',
         mimeType: 'image/png',
@@ -123,5 +129,44 @@ describe('uploads api', () => {
     expect(bucketFile).toHaveBeenCalledWith('stores/store-1/gallery/item-1.jpg')
     expect(bucketFileDelete).toHaveBeenCalledWith({ ignoreNotFound: true })
     expect(res.payload).toEqual({ deleted: true })
+  })
+
+  it('accepts direct binary upload payloads with upload headers', async () => {
+    const req = {
+      method: 'POST',
+      headers: {
+        'content-type': 'image/png',
+        'x-upload-filename': encodeURIComponent('gallery.png'),
+        'x-upload-mimetype': 'image/png',
+        'x-upload-storage-path': encodeURIComponent('stores/store-1/gallery/hero.jpg'),
+      },
+      body: Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0x01]),
+    }
+    const res = createResponse()
+
+    await handler(req as any, res as any)
+
+    expect(res.statusCode).toBe(201)
+    expect(bucketFile).toHaveBeenCalledWith('stores/store-1/gallery/hero.jpg')
+  })
+
+  it('rejects payloads when declared MIME does not match detected bytes', async () => {
+    const req = {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+      },
+      body: {
+        filename: 'promo.png',
+        mimeType: 'image/png',
+        dataBase64: Buffer.from([0xff, 0xd8, 0xff, 0x00]).toString('base64'),
+      },
+    }
+    const res = createResponse()
+
+    await handler(req as any, res as any)
+
+    expect(res.statusCode).toBe(400)
+    expect(res.payload).toEqual({ error: 'MIME type does not match uploaded file content.' })
   })
 })

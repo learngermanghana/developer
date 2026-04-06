@@ -116,7 +116,7 @@ type PromoGalleryDraftItem = {
   isPublished: boolean
 }
 
-const MAX_PROMO_GALLERY_ITEMS = 3
+const MAX_PROMO_GALLERY_ITEMS = 6
 const EXACT_UPLOAD_LIMIT_HINT = 'Maximum upload size is 5 MB (5,242,880 bytes).'
 
 function toNullableString(value: unknown) {
@@ -975,9 +975,16 @@ export default function AccountOverview({
         caption: item.caption.trim(),
       }))
       .filter(item => item.url)
+    const submittedPersistedIds = new Set(
+      trimmedItems
+        .filter(item => !item.id.startsWith('draft-'))
+        .map(item => item.id),
+    )
 
     try {
       setIsSavingPromoGallery(true)
+      const existingSnapshot = await getDocs(collection(db, 'stores', storeId, 'promoGallery'))
+
       await Promise.all(
         trimmedItems.map(item => {
           const basePayload = {
@@ -997,6 +1004,26 @@ export default function AccountOverview({
           return setDoc(doc(db, 'stores', storeId, 'promoGallery', item.id), basePayload, { merge: true })
         }),
       )
+
+      const staleItems = existingSnapshot.docs.filter(itemDoc => !submittedPersistedIds.has(itemDoc.id))
+      await Promise.all(
+        staleItems.map(async staleItemDoc => {
+          const staleData = staleItemDoc.data() as Record<string, unknown>
+          const staleUrl = typeof staleData.url === 'string' ? staleData.url.trim() : ''
+          if (staleUrl) {
+            try {
+              await deleteUploadedImageByUrl(staleUrl)
+            } catch (error) {
+              console.warn('[account] Failed to delete stale promo gallery image file', {
+                galleryItemId: staleItemDoc.id,
+                error,
+              })
+            }
+          }
+          await deleteDoc(doc(db, 'stores', storeId, 'promoGallery', staleItemDoc.id))
+        }),
+      )
+
       publish({ message: 'Promo gallery saved.', tone: 'success' })
 
       const galleryQuery = query(

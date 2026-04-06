@@ -28,8 +28,9 @@ describe('productImageUpload api client', () => {
 
     expect(global.fetch).toHaveBeenCalledTimes(1)
     const [, init] = (global.fetch as any).mock.calls[0]
-    const body = JSON.parse(init.body)
-    expect(body.storagePath).toBe('stores/store-1/promo.jpg')
+    expect(init.body).toBeInstanceOf(File)
+    expect(init.headers['X-Upload-Storage-Path']).toBe(encodeURIComponent('stores/store-1/promo.jpg'))
+    expect(init.headers['X-Upload-MimeType']).toBe('image/png')
   })
 
   it('returns precise deletion errors for gallery cleanup failures', async () => {
