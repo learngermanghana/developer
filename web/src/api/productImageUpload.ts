@@ -38,16 +38,6 @@ function resolveUploadEndpoint(): string {
   return DEFAULT_UPLOAD_ENDPOINT
 }
 
-async function readFileAsBase64(file: File): Promise<string> {
-  const arrayBuffer = await file.arrayBuffer()
-  const bytes = new Uint8Array(arrayBuffer)
-  let binary = ''
-  bytes.forEach(byte => {
-    binary += String.fromCharCode(byte)
-  })
-  return btoa(binary)
-}
-
 async function loadImageFromFile(file: File): Promise<HTMLImageElement> {
   const objectUrl = URL.createObjectURL(file)
   try {
@@ -125,21 +115,20 @@ async function createUploadCandidate(file: File): Promise<File> {
 export async function uploadProductImage(file: File, options: UploadImageOptions = {}): Promise<string> {
   const endpoint = resolveUploadEndpoint()
   const uploadFile = await createUploadCandidate(file)
-  const dataBase64 = await readFileAsBase64(uploadFile)
 
   let response: Response
   try {
     response = await fetch(endpoint, {
       method: 'POST',
       headers: {
-        'Content-Type': 'application/json',
+        'Content-Type': uploadFile.type || 'application/octet-stream',
+        'X-Upload-Filename': encodeURIComponent(uploadFile.name),
+        'X-Upload-MimeType': uploadFile.type || 'application/octet-stream',
+        ...(options.storagePath
+          ? { 'X-Upload-Storage-Path': encodeURIComponent(options.storagePath) }
+          : {}),
       },
-      body: JSON.stringify({
-        filename: uploadFile.name,
-        mimeType: uploadFile.type,
-        dataBase64,
-        storagePath: options.storagePath,
-      }),
+      body: uploadFile,
     })
   } catch (error) {
     throw new ProductImageUploadError(

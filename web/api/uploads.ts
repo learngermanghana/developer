@@ -3,6 +3,14 @@ import { getStorage } from 'firebase-admin/storage'
 import { getAdmin } from './_firebase-admin.js'
 
 const MAX_BYTES = 5 * 1024 * 1024
+const SUPPORTED_IMAGE_MIME_TYPES = new Set([
+  'image/jpeg',
+  'image/png',
+  'image/webp',
+  'image/gif',
+  'image/avif',
+  'image/svg+xml',
+])
 
 type UploadRequestBody = {
   filename?: unknown
@@ -29,6 +37,18 @@ function resolveExtension(filename: string, mimeType: string): string {
   if (mimeType === 'image/avif') return '.avif'
   if (mimeType === 'image/svg+xml') return '.svg'
   return '.jpg'
+}
+
+function readHeaderString(header: unknown): string | null {
+  if (Array.isArray(header)) return null
+  if (typeof header !== 'string') return null
+  const trimmed = header.trim()
+  if (!trimmed) return null
+  try {
+    return decodeURIComponent(trimmed)
+  } catch {
+    return trimmed
+  }
 }
 
 function normalizeStoragePath(value: unknown): string | null {
@@ -60,7 +80,100 @@ function extractObjectPathFromUrl(urlValue: unknown, bucketName: string): string
   return normalizeStoragePath(decoded)
 }
 
+function detectImageMimeType(buffer: Buffer): string | null {
+  if (!buffer.length) return null
+
+  if (buffer.length >= 3 && buffer[0] === 0xff && buffer[1] === 0xd8 && buffer[2] === 0xff) {
+    return 'image/jpeg'
+  }
+  if (
+    buffer.length >= 8 &&
+    buffer[0] === 0x89 &&
+    buffer[1] === 0x50 &&
+    buffer[2] === 0x4e &&
+    buffer[3] === 0x47 &&
+    buffer[4] === 0x0d &&
+    buffer[5] === 0x0a &&
+    buffer[6] === 0x1a &&
+    buffer[7] === 0x0a
+  ) {
+    return 'image/png'
+  }
+  if (
+    buffer.length >= 12 &&
+    buffer[0] === 0x52 &&
+    buffer[1] === 0x49 &&
+    buffer[2] === 0x46 &&
+    buffer[3] === 0x46 &&
+    buffer[8] === 0x57 &&
+    buffer[9] === 0x45 &&
+    buffer[10] === 0x42 &&
+    buffer[11] === 0x50
+  ) {
+    return 'image/webp'
+  }
+  if (
+    buffer.length >= 6 &&
+    String.fromCharCode(buffer[0], buffer[1], buffer[2], buffer[3], buffer[4], buffer[5]) === 'GIF87a'
+  ) {
+    return 'image/gif'
+  }
+  if (
+    buffer.length >= 6 &&
+    String.fromCharCode(buffer[0], buffer[1], buffer[2], buffer[3], buffer[4], buffer[5]) === 'GIF89a'
+  ) {
+    return 'image/gif'
+  }
+  if (
+    buffer.length >= 12 &&
+    buffer[4] === 0x66 &&
+    buffer[5] === 0x74 &&
+    buffer[6] === 0x79 &&
+    buffer[7] === 0x70 &&
+    buffer[8] === 0x61 &&
+    buffer[9] === 0x76 &&
+    buffer[10] === 0x69 &&
+    buffer[11] === 0x66
+  ) {
+    return 'image/avif'
+  }
+
+  const header = buffer.subarray(0, Math.min(buffer.length, 512)).toString('utf8').trimStart().toLowerCase()
+  if (header.startsWith('<svg') || header.startsWith('<?xml')) return 'image/svg+xml'
+
+  return null
+}
+
+function isSvgPayloadSafe(buffer: Buffer): boolean {
+  const text = buffer.toString('utf8')
+  const normalized = text.toLowerCase()
+  if (/<script[\s>]/.test(normalized)) return false
+  if (/\bon\w+\s*=/.test(normalized)) return false
+  if (/(href|xlink:href)\s*=\s*['"]\s*javascript:/i.test(text)) return false
+  return true
+}
+
+function emitUploadMetric(event: string, fields: Record<string, unknown>) {
+  console.info(
+    '[api/uploads][metric]',
+    JSON.stringify({
+      event,
+      at: new Date().toISOString(),
+      ...fields,
+    }),
+  )
+}
+
+function toBufferPayload(value: unknown): Buffer | null {
+  if (!value) return null
+  if (value instanceof Buffer) return value
+  if (value instanceof Uint8Array) return Buffer.from(value)
+  if (typeof value === 'string') return Buffer.from(value, 'binary')
+  return null
+}
+
 export default async function handler(req: VercelRequest, res: VercelResponse) {
+  const requestStart = Date.now()
   if (req.method !== 'POST' && req.method !== 'DELETE') {
     return res.status(405).json({ error: 'Method not allowed. Use POST or DELETE.' })
   }
@@ -80,33 +193,61 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method === 'DELETE') {
     const objectPath = extractObjectPathFromUrl((req.body || {}).url, bucket.name)
     if (!objectPath) {
+      emitUploadMetric('delete_validation_error', {
+        bucket: bucket.name,
+        latencyMs: Date.now() - requestStart,
+      })
       return res.status(400).json({ error: 'A valid storage.googleapis.com image URL is required.' })
     }
 
     try {
       await bucket.file(objectPath).delete({ ignoreNotFound: true })
+      emitUploadMetric('delete_success', {
+        bucket: bucket.name,
+        latencyMs: Date.now() - requestStart,
+      })
       return res.status(200).json({ deleted: true })
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error)
+      emitUploadMetric('delete_failure', {
+        bucket: bucket.name,
+        latencyMs: Date.now() - requestStart,
+        errorMessage: message,
+      })
       return res.status(500).json({ error: `Failed to delete image: ${message}` })
     }
   }
 
-  const { filename, mimeType, dataBase64 } = (req.body || {}) as UploadRequestBody
-
-  if (typeof mimeType !== 'string' || !mimeType.trim() || !mimeType.startsWith('image/')) {
-    return res.status(400).json({ error: 'Only image MIME types are allowed.' })
-  }
-
-  if (typeof dataBase64 !== 'string' || !dataBase64.trim()) {
-    return res.status(400).json({ error: 'Image payload is empty.' })
-  }
-
+  const isLegacyJsonPayload = req.headers?.['content-type']?.includes('application/json')
+  let filename: unknown
+  let mimeType: unknown
+  let storagePath: unknown
   let fileBuffer: Buffer
-  try {
-    fileBuffer = Buffer.from(dataBase64, 'base64')
-  } catch {
-    return res.status(400).json({ error: 'Invalid base64 payload.' })
+
+  if (isLegacyJsonPayload) {
+    const body = (req.body || {}) as UploadRequestBody
+    filename = body.filename
+    mimeType = body.mimeType
+    storagePath = body.storagePath
+
+    const dataBase64 = body.dataBase64
+    if (typeof dataBase64 !== 'string' || !dataBase64.trim()) {
+      return res.status(400).json({ error: 'Image payload is empty.' })
+    }
+    try {
+      fileBuffer = Buffer.from(dataBase64, 'base64')
+    } catch {
+      return res.status(400).json({ error: 'Invalid base64 payload.' })
+    }
+  } else {
+    filename = readHeaderString(req.headers?.['x-upload-filename']) || 'upload'
+    mimeType = readHeaderString(req.headers?.['x-upload-mimetype']) || req.headers?.['content-type'] || ''
+    storagePath = readHeaderString(req.headers?.['x-upload-storage-path'])
+    const binaryPayload = toBufferPayload(req.body)
+    if (!binaryPayload) {
+      return res.status(400).json({ error: 'Binary image payload is empty.' })
+    }
+    fileBuffer = binaryPayload
   }
 
   if (!fileBuffer.length) {
@@ -114,14 +255,55 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   if (fileBuffer.length > MAX_BYTES) {
+    emitUploadMetric('upload_rejected_size_limit', {
+      bucket: bucket.name,
+      sizeBytes: fileBuffer.length,
+      latencyMs: Date.now() - requestStart,
+      transport: isLegacyJsonPayload ? 'base64-json' : 'binary',
+    })
     return res.status(413).json({ error: 'Image exceeds max size of 5 MB.' })
+  }
+
+  const detectedMimeType = detectImageMimeType(fileBuffer)
+  const requestedMimeType =
+    typeof mimeType === 'string' ? mimeType.trim().toLowerCase() : ''
+
+  if (!detectedMimeType || !SUPPORTED_IMAGE_MIME_TYPES.has(detectedMimeType)) {
+    emitUploadMetric('upload_rejected_invalid_content', {
+      bucket: bucket.name,
+      requestedMimeType,
+      detectedMimeType,
+      sizeBytes: fileBuffer.length,
+      latencyMs: Date.now() - requestStart,
+    })
+    return res.status(400).json({ error: 'Unsupported or invalid image file content.' })
+  }
+
+  if (requestedMimeType && requestedMimeType !== detectedMimeType) {
+    emitUploadMetric('upload_rejected_mime_mismatch', {
+      bucket: bucket.name,
+      requestedMimeType,
+      detectedMimeType,
+      sizeBytes: fileBuffer.length,
+      latencyMs: Date.now() - requestStart,
+    })
+    return res.status(400).json({ error: 'MIME type does not match uploaded file content.' })
+  }
+
+  if (detectedMimeType === 'image/svg+xml' && !isSvgPayloadSafe(fileBuffer)) {
+    emitUploadMetric('upload_rejected_svg_security', {
+      bucket: bucket.name,
+      sizeBytes: fileBuffer.length,
+      latencyMs: Date.now() - requestStart,
+    })
+    return res.status(400).json({ error: 'SVG contains unsupported active content.' })
   }
 
   try {
     const safeFilename = normalizeFilename(filename)
-    const basename = safeFilename.replace(/\.(jpe?g|png|webp|gif|avif|svg)$/i, '')
-    const ext = resolveExtension(safeFilename, mimeType)
-    const explicitStoragePath = normalizeStoragePath((req.body || {}).storagePath)
+    const basename = safeFilename.replace(/\.(jpe?g|png|webp|gif|avif|svg)$/i, '') || 'upload'
+    const ext = resolveExtension(safeFilename, detectedMimeType)
+    const explicitStoragePath = normalizeStoragePath(storagePath)
     const objectName = explicitStoragePath || `product-images/${Date.now()}-${basename}${ext}`
 
     console.log('[api/uploads] bucket env check', {
@@ -141,7 +323,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     await file.save(fileBuffer, {
       resumable: false,
       metadata: {
-        contentType: mimeType, // moved inside metadata
+        contentType: detectedMimeType,
         cacheControl: explicitStoragePath
           ? 'no-cache,max-age=0,must-revalidate'
           : 'public,max-age=31536000,immutable',
@@ -150,6 +332,15 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     const basePublicUrl = `https://storage.googleapis.com/${bucket.name}/${encodeURI(objectName)}`
     const publicUrl = explicitStoragePath ? `${basePublicUrl}?v=${Date.now()}` : basePublicUrl
+    emitUploadMetric('upload_success', {
+      bucket: bucket.name,
+      storagePath: objectName,
+      sizeBytes: fileBuffer.length,
+      mimeType: detectedMimeType,
+      latencyMs: Date.now() - requestStart,
+      transport: isLegacyJsonPayload ? 'base64-json' : 'binary',
+      isStablePath: !!explicitStoragePath,
+    })
     return res.status(201).json({ url: publicUrl })
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error)
@@ -165,6 +356,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       hasFirebaseServiceAccountJson: !!process.env.FIREBASE_SERVICE_ACCOUNT_JSON,
       hasFirebaseServiceAccountBase64: !!process.env.FIREBASE_SERVICE_ACCOUNT_BASE64,
       firebaseProjectId: process.env.FIREBASE_PROJECT_ID || null,
+    })
+    emitUploadMetric('upload_failure', {
+      bucket: bucket.name,
+      sizeBytes: fileBuffer.length,
+      latencyMs: Date.now() - requestStart,
+      requestedMimeType,
+      errorMessage: message,
+      transport: isLegacyJsonPayload ? 'base64-json' : 'binary',
     })
 
     return res.status(500).json({
