@@ -1566,6 +1566,38 @@ function toTrimmedStringOrNull(value) {
     const trimmed = value.trim();
     return trimmed ? trimmed : null;
 }
+function extractYoutubeVideoId(value) {
+    if (!value)
+        return null;
+    try {
+        const parsed = new URL(value);
+        const hostname = parsed.hostname.toLowerCase();
+        if (hostname === 'youtu.be') {
+            const id = parsed.pathname.replace(/^\/+/, '').split('/')[0]?.trim();
+            return id || null;
+        }
+        if (hostname === 'www.youtube.com' || hostname === 'youtube.com' || hostname === 'm.youtube.com') {
+            const watchId = parsed.searchParams.get('v')?.trim();
+            if (watchId)
+                return watchId;
+            const parts = parsed.pathname.split('/').filter(Boolean);
+            const embedIndex = parts.findIndex(part => part === 'embed' || part === 'shorts');
+            if (embedIndex >= 0 && parts[embedIndex + 1]) {
+                return parts[embedIndex + 1].trim() || null;
+            }
+        }
+    }
+    catch {
+        return null;
+    }
+    return null;
+}
+function toYoutubeEmbedUrl(value) {
+    const videoId = extractYoutubeVideoId(value);
+    if (!videoId)
+        return null;
+    return `https://www.youtube.com/embed/${videoId}`;
+}
 function toTrimmedStringArray(value) {
     if (!Array.isArray(value)) {
         return [];
@@ -1788,6 +1820,8 @@ exports.integrationPromo = functions.https.onRequest(async (req, res) => {
             startDate: toTrimmedStringOrNull(data.promoStartDate),
             endDate: toTrimmedStringOrNull(data.promoEndDate),
             websiteUrl: toTrimmedStringOrNull(data.promoWebsiteUrl),
+            youtubeUrl: toTrimmedStringOrNull(data.promoYoutubeUrl),
+            youtubeEmbedUrl: toYoutubeEmbedUrl(toTrimmedStringOrNull(data.promoYoutubeUrl)),
             imageUrl: toTrimmedStringOrNull(data.promoImageUrl),
             imageAlt: toTrimmedStringOrNull(data.promoImageAlt),
             phone: toTrimmedStringOrNull(data.phone),

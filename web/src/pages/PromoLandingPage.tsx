@@ -13,6 +13,17 @@ type PromoProfile = {
   startDate: string | null
   endDate: string | null
   websiteUrl: string | null
+  youtubeUrl: string | null
+  youtubeEmbedUrl: string | null
+  youtubeChannelId: string | null
+  youtubeVideos: Array<{
+    videoId: string
+    title: string | null
+    watchUrl: string
+    embedUrl: string
+    thumbnailUrl: string | null
+    publishedAt: string | null
+  }>
   imageUrl: string | null
   imageAlt: string | null
 }
@@ -34,6 +45,17 @@ type PromoApiResponse = {
     startDate?: string | null
     endDate?: string | null
     websiteUrl?: string | null
+    youtubeUrl?: string | null
+    youtubeEmbedUrl?: string | null
+    youtubeChannelId?: string | null
+    youtubeVideos?: Array<{
+      videoId?: string | null
+      title?: string | null
+      watchUrl?: string | null
+      embedUrl?: string | null
+      thumbnailUrl?: string | null
+      publishedAt?: string | null
+    }>
     imageUrl?: string | null
     imageAlt?: string | null
     phone?: string | null
@@ -99,6 +121,41 @@ function sanitizeSummary(value: string | null, storeName: string): string {
   }
 
   return compact
+}
+
+function toYoutubeEmbedUrl(value: string | null): string | null {
+  if (!value) return null
+  try {
+    const parsed = new URL(value)
+    const hostname = parsed.hostname.toLowerCase()
+    if (hostname === 'youtu.be') {
+      const id = parsed.pathname.replace(/^\/+/, '').split('/')[0]?.trim()
+      return id ? `https://www.youtube.com/embed/${id}` : null
+    }
+    if (hostname === 'www.youtube.com' || hostname === 'youtube.com' || hostname === 'm.youtube.com') {
+      const watchId = parsed.searchParams.get('v')?.trim()
+      if (watchId) return `https://www.youtube.com/embed/${watchId}`
+      const parts = parsed.pathname.split('/').filter(Boolean)
+      const embedIndex = parts.findIndex(part => part === 'embed' || part === 'shorts')
+      if (embedIndex >= 0 && parts[embedIndex + 1]) {
+        return `https://www.youtube.com/embed/${parts[embedIndex + 1].trim()}`
+      }
+    }
+  } catch {
+    return null
+  }
+  return null
+}
+
+function formatPublishedDate(value: string | null): string | null {
+  if (!value) return null
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return null
+  return date.toLocaleDateString(undefined, {
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric',
+  })
 }
 
 function getIntegrationEndpoint(path: string): string {
@@ -263,6 +320,42 @@ export default function PromoLandingPage() {
           startDate: typeof promo.startDate === 'string' ? promo.startDate : null,
           endDate: typeof promo.endDate === 'string' ? promo.endDate : null,
           websiteUrl: typeof promo.websiteUrl === 'string' ? promo.websiteUrl : null,
+          youtubeUrl: typeof promo.youtubeUrl === 'string' ? promo.youtubeUrl : null,
+          youtubeEmbedUrl:
+            typeof promo.youtubeEmbedUrl === 'string'
+              ? promo.youtubeEmbedUrl
+              : toYoutubeEmbedUrl(typeof promo.youtubeUrl === 'string' ? promo.youtubeUrl : null),
+          youtubeChannelId:
+            typeof promo.youtubeChannelId === 'string' ? promo.youtubeChannelId : null,
+          youtubeVideos: Array.isArray(promo.youtubeVideos)
+            ? promo.youtubeVideos
+                .map(item => {
+                  const videoId = typeof item.videoId === 'string' ? item.videoId.trim() : ''
+                  const watchUrl = typeof item.watchUrl === 'string' ? item.watchUrl.trim() : ''
+                  const embedUrl = typeof item.embedUrl === 'string' ? item.embedUrl.trim() : ''
+                  if (!videoId || !watchUrl || !embedUrl) return null
+                  return {
+                    videoId,
+                    title: typeof item.title === 'string' ? item.title : null,
+                    watchUrl,
+                    embedUrl,
+                    thumbnailUrl: typeof item.thumbnailUrl === 'string' ? item.thumbnailUrl : null,
+                    publishedAt: typeof item.publishedAt === 'string' ? item.publishedAt : null,
+                  }
+                })
+                .filter(
+                  (
+                    item,
+                  ): item is {
+                    videoId: string
+                    title: string | null
+                    watchUrl: string
+                    embedUrl: string
+                    thumbnailUrl: string | null
+                    publishedAt: string | null
+                  } => item !== null,
+                )
+            : [],
           imageUrl: typeof promo.imageUrl === 'string' ? promo.imageUrl : null,
           imageAlt: typeof promo.imageAlt === 'string' ? promo.imageAlt : null,
         })
@@ -396,6 +489,7 @@ export default function PromoLandingPage() {
 
   const promoTitle = profile.title?.trim() || `Special offers at ${profile.storeName}`
   const promoSummary = sanitizeSummary(profile.summary, profile.storeName)
+  const primaryPromoVideoEmbedUrl = profile.youtubeVideos[0]?.embedUrl ?? profile.youtubeEmbedUrl
   return (
     <main className="promo-page">
       <nav className="promo-nav" aria-label="Promo sections">
@@ -462,6 +556,48 @@ export default function PromoLandingPage() {
             </p>
           ) : null}
           <p className="promo-summary">{promoSummary}</p>
+          {primaryPromoVideoEmbedUrl ? (
+            <div className="promo-video-wrapper">
+              <iframe
+                className="promo-video"
+                src={primaryPromoVideoEmbedUrl}
+                title={`${profile.storeName} promo video`}
+                loading="lazy"
+                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                referrerPolicy="strict-origin-when-cross-origin"
+                allowFullScreen
+              />
+            </div>
+          ) : null}
+          {profile.youtubeVideos.length > 1 ? (
+            <div className="promo-video-list" role="list" aria-label="Latest YouTube videos">
+              {profile.youtubeVideos.map(video => (
+                <a
+                  key={video.videoId}
+                  className="promo-video-list__item"
+                  href={video.watchUrl}
+                  target="_blank"
+                  rel="noreferrer noopener"
+                  role="listitem"
+                >
+                  {video.thumbnailUrl ? (
+                    <img
+                      className="promo-video-list__thumb"
+                      src={video.thumbnailUrl}
+                      alt={video.title ?? `${profile.storeName} video thumbnail`}
+                      loading="lazy"
+                    />
+                  ) : null}
+                  <span className="promo-video-list__meta">
+                    <strong>{video.title ?? 'Latest upload'}</strong>
+                    {formatPublishedDate(video.publishedAt) ? (
+                      <small>Published {formatPublishedDate(video.publishedAt)}</small>
+                    ) : null}
+                  </span>
+                </a>
+              ))}
+            </div>
+          ) : null}
           {(profile.startDate || profile.endDate) && (
             <p className="promo-dates">
               Offer window: {profile.startDate || 'Now'} – {profile.endDate || 'Limited time'}
