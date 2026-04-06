@@ -68,6 +68,8 @@ type StoreProfile = {
   promoEndDate: string | null
   promoSlug: string | null
   promoWebsiteUrl: string | null
+  promoYoutubeUrl: string | null
+  promoYoutubeChannelId: string | null
   promoImageUrl: string | null
   promoImageAlt: string | null
 }
@@ -238,6 +240,8 @@ function mapStoreSnapshot(
     promoEndDate: toNullableString((data as any).promoEndDate),
     promoSlug: toNullableString((data as any).promoSlug),
     promoWebsiteUrl: toNullableString((data as any).promoWebsiteUrl),
+    promoYoutubeUrl: toNullableString((data as any).promoYoutubeUrl),
+    promoYoutubeChannelId: toNullableString((data as any).promoYoutubeChannelId),
     promoImageUrl: toNullableString((data as any).promoImageUrl),
     promoImageAlt: toNullableString((data as any).promoImageAlt),
   }
@@ -382,6 +386,8 @@ export default function AccountOverview({
     startDate: '',
     endDate: '',
     websiteUrl: '',
+    youtubeUrl: '',
+    youtubeChannelId: '',
     imageUrl: '',
     imageAlt: '',
   })
@@ -566,6 +572,8 @@ export default function AccountOverview({
       startDate: profile.promoStartDate ?? '',
       endDate: profile.promoEndDate ?? '',
       websiteUrl: profile.promoWebsiteUrl ?? '',
+      youtubeUrl: profile.promoYoutubeUrl ?? '',
+      youtubeChannelId: profile.promoYoutubeChannelId ?? '',
       imageUrl: profile.promoImageUrl ?? '',
       imageAlt: profile.promoImageAlt ?? '',
     })
@@ -867,6 +875,8 @@ export default function AccountOverview({
         promoEndDate: normalizeInput(promoDraft.endDate),
         promoSlug,
         promoWebsiteUrl: normalizeInput(promoDraft.websiteUrl),
+        promoYoutubeUrl: normalizeInput(promoDraft.youtubeUrl),
+        promoYoutubeChannelId: normalizeInput(promoDraft.youtubeChannelId),
         promoImageUrl: normalizeInput(promoDraft.imageUrl),
         promoImageAlt: normalizeInput(promoDraft.imageAlt),
         updatedAt: Timestamp.now(),
@@ -885,6 +895,8 @@ export default function AccountOverview({
               promoEndDate: payload.promoEndDate,
               promoSlug: payload.promoSlug,
               promoWebsiteUrl: payload.promoWebsiteUrl,
+              promoYoutubeUrl: payload.promoYoutubeUrl,
+              promoYoutubeChannelId: payload.promoYoutubeChannelId,
               promoImageUrl: payload.promoImageUrl,
               promoImageAlt: payload.promoImageAlt,
               updatedAt: payload.updatedAt,
@@ -2129,6 +2141,30 @@ export default function AccountOverview({
                     onChange={e => updatePromoDraft('websiteUrl', e.target.value)}
                     placeholder="https://yourstore.com/promotions"
                     data-testid="account-promo-website"
+                  />
+                </label>
+              </div>
+              <div>
+                <label style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                  <span>YouTube video URL (optional)</span>
+                  <input
+                    type="url"
+                    value={promoDraft.youtubeUrl}
+                    onChange={e => updatePromoDraft('youtubeUrl', e.target.value)}
+                    placeholder="https://www.youtube.com/watch?v=..."
+                    data-testid="account-promo-youtube"
+                  />
+                </label>
+              </div>
+              <div>
+                <label style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                  <span>YouTube channel ID / URL (auto latest videos)</span>
+                  <input
+                    type="text"
+                    value={promoDraft.youtubeChannelId}
+                    onChange={e => updatePromoDraft('youtubeChannelId', e.target.value)}
+                    placeholder="UC... or https://www.youtube.com/channel/UC..."
+                    data-testid="account-promo-youtube-channel"
                   />
                 </label>
               </div>

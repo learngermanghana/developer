@@ -90,6 +90,56 @@
   font-size: 1.03rem;
 }
 
+.promo-video-wrapper {
+  width: 100%;
+  border: 1px solid #dbeafe;
+  border-radius: 14px;
+  overflow: hidden;
+  background: #0f172a;
+}
+
+.promo-video {
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  border: 0;
+  display: block;
+}
+
+.promo-video-list {
+  display: grid;
+  gap: 10px;
+}
+
+.promo-video-list__item {
+  display: grid;
+  grid-template-columns: 132px 1fr;
+  gap: 10px;
+  align-items: center;
+  padding: 8px;
+  border: 1px solid #dbeafe;
+  border-radius: 10px;
+  text-decoration: none;
+  color: inherit;
+  background: #f8fafc;
+}
+
+.promo-video-list__thumb {
+  width: 132px;
+  height: 74px;
+  object-fit: cover;
+  border-radius: 8px;
+  background: #0f172a;
+}
+
+.promo-video-list__meta {
+  display: grid;
+  gap: 4px;
+}
+
+.promo-video-list__meta small {
+  color: #475569;
+}
+
 .promo-cta {
   justify-self: start;
   margin-top: 6px;

@@ -2060,6 +2060,100 @@ function toTrimmedStringOrNull(value: unknown): string | null {
   return trimmed ? trimmed : null
 }
 
+function extractYoutubeVideoId(value: string | null): string | null {
+  if (!value) return null
+  try {
+    const parsed = new URL(value)
+    const hostname = parsed.hostname.toLowerCase()
+    if (hostname === 'youtu.be') {
+      const id = parsed.pathname.replace(/^\/+/, '').split('/')[0]?.trim()
+      return id || null
+    }
+    if (hostname === 'www.youtube.com' || hostname === 'youtube.com' || hostname === 'm.youtube.com') {
+      const watchId = parsed.searchParams.get('v')?.trim()
+      if (watchId) return watchId
+      const parts = parsed.pathname.split('/').filter(Boolean)
+      const embedIndex = parts.findIndex(part => part === 'embed' || part === 'shorts')
+      if (embedIndex >= 0 && parts[embedIndex + 1]) {
+        return parts[embedIndex + 1].trim() || null
+      }
+    }
+  } catch {
+    return null
+  }
+  return null
+}
+
+function toYoutubeEmbedUrl(value: string | null): string | null {
+  const videoId = extractYoutubeVideoId(value)
+  if (!videoId) return null
+  return `https://www.youtube.com/embed/${videoId}`
+}
+
+function extractXmlTag(source: string, tagName: string): string | null {
+  const match = source.match(new RegExp(`<${tagName}>([\\s\\S]*?)<\\/${tagName}>`, 'i'))
+  if (!match || typeof match[1] !== 'string') return null
+  const value = match[1].trim()
+  return value || null
+}
+
+type YoutubeFeedVideo = {
+  videoId: string
+  title: string | null
+  publishedAt: string | null
+  watchUrl: string
+  embedUrl: string
+  thumbnailUrl: string | null
+}
+
+async function fetchYoutubeChannelVideos(channelId: string, limit: number = 5): Promise<YoutubeFeedVideo[]> {
+  const safeLimit = Math.max(1, Math.min(10, Math.floor(limit)))
+  const feedUrl = `https://www.youtube.com/feeds/videos.xml?channel_id=${encodeURIComponent(channelId)}`
+  const response = await fetch(feedUrl, { method: 'GET' })
+  if (!response.ok) {
+    throw new Error(`YouTube feed request failed with status ${response.status}`)
+  }
+  const xml = await response.text()
+  const entryMatches = xml.match(/<entry>[\s\S]*?<\/entry>/gi) ?? []
+
+  const videos: YoutubeFeedVideo[] = []
+  for (const entry of entryMatches.slice(0, safeLimit)) {
+    const videoId = extractXmlTag(entry, 'yt:videoId')
+    if (!videoId) continue
+    const title = extractXmlTag(entry, 'title')
+    const publishedAt = extractXmlTag(entry, 'published')
+    videos.push({
+      videoId,
+      title,
+      publishedAt,
+      watchUrl: `https://www.youtube.com/watch?v=${encodeURIComponent(videoId)}`,
+      embedUrl: `https://www.youtube.com/embed/${encodeURIComponent(videoId)}`,
+      thumbnailUrl: `https://i.ytimg.com/vi/${encodeURIComponent(videoId)}/hqdefault.jpg`,
+    })
+  }
+  return videos
+}
+
+function toYoutubeChannelIdOrNull(value: string | null): string | null {
+  if (!value) return null
+  const trimmed = value.trim()
+  if (!trimmed) return null
+  if (/^UC[a-zA-Z0-9_-]{10,}$/.test(trimmed)) {
+    return trimmed
+  }
+  try {
+    const parsed = new URL(trimmed)
+    const parts = parsed.pathname.split('/').filter(Boolean)
+    const channelIndex = parts.findIndex(segment => segment === 'channel')
+    if (channelIndex >= 0 && parts[channelIndex + 1] && /^UC[a-zA-Z0-9_-]{10,}$/.test(parts[channelIndex + 1])) {
+      return parts[channelIndex + 1]
+    }
+  } catch {
+    return null
+  }
+  return null
+}
+
 
 function toTrimmedStringArray(value: unknown): string[] {
   if (!Array.isArray(value)) {
@@ -2306,6 +2400,20 @@ export const integrationPromo = functions.https.onRequest(async (req, res) => {
     return
   }
   const { storeId, data } = storeContext
+  const youtubeUrl = toTrimmedStringOrNull(data.promoYoutubeUrl)
+  const youtubeChannelId = toYoutubeChannelIdOrNull(toTrimmedStringOrNull(data.promoYoutubeChannelId))
+  let youtubeVideos: YoutubeFeedVideo[] = []
+  if (youtubeChannelId) {
+    try {
+      youtubeVideos = await fetchYoutubeChannelVideos(youtubeChannelId, 5)
+    } catch (error) {
+      console.warn('[integrationPromo] Unable to fetch YouTube channel videos', {
+        storeId,
+        youtubeChannelId,
+        error: error instanceof Error ? error.message : String(error),
+      })
+    }
+  }
   res.status(200).json({
     storeId,
     promo: {
@@ -2316,6 +2424,10 @@ export const integrationPromo = functions.https.onRequest(async (req, res) => {
       startDate: toTrimmedStringOrNull(data.promoStartDate),
       endDate: toTrimmedStringOrNull(data.promoEndDate),
       websiteUrl: toTrimmedStringOrNull(data.promoWebsiteUrl),
+      youtubeUrl,
+      youtubeEmbedUrl: toYoutubeEmbedUrl(youtubeUrl),
+      youtubeChannelId,
+      youtubeVideos,
       imageUrl: toTrimmedStringOrNull(data.promoImageUrl),
       imageAlt: toTrimmedStringOrNull(data.promoImageAlt),
       phone: toTrimmedStringOrNull(data.phone),
