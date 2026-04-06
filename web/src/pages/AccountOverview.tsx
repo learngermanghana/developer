@@ -116,7 +116,14 @@ type PromoGalleryDraftItem = {
   isPublished: boolean
 }
 
-const MAX_PROMO_GALLERY_ITEMS = 6
+const MAX_PROMO_GALLERY_ITEMS_BY_PLAN = {
+  free: 5,
+  starter: 10,
+  growth: 15,
+  scale: 20,
+} as const
+const DEFAULT_MAX_PROMO_GALLERY_ITEMS = MAX_PROMO_GALLERY_ITEMS_BY_PLAN.free
+const MAX_PROMO_GALLERY_QUERY_LIMIT = 100
 const EXACT_UPLOAD_LIMIT_HINT = 'Maximum upload size is 5 MB (5,242,880 bytes).'
 
 function toNullableString(value: unknown) {
@@ -137,6 +144,18 @@ function buildUploadErrorMessage(error: unknown): string {
     return `${error.message} ${EXACT_UPLOAD_LIMIT_HINT}`.trim()
   }
   return `Image upload failed. ${EXACT_UPLOAD_LIMIT_HINT} Please try again.`
+}
+
+function getPromoGalleryLimit(plan: string | null | undefined): number {
+  const normalizedPlan = (plan ?? '').trim().toLowerCase()
+  if (!normalizedPlan) return DEFAULT_MAX_PROMO_GALLERY_ITEMS
+  if (normalizedPlan.includes('scale')) return MAX_PROMO_GALLERY_ITEMS_BY_PLAN.scale
+  if (normalizedPlan.includes('growth')) return MAX_PROMO_GALLERY_ITEMS_BY_PLAN.growth
+  if (normalizedPlan.includes('starter')) return MAX_PROMO_GALLERY_ITEMS_BY_PLAN.starter
+  if (normalizedPlan.includes('free') || normalizedPlan.includes('trial')) {
+    return MAX_PROMO_GALLERY_ITEMS_BY_PLAN.free
+  }
+  return DEFAULT_MAX_PROMO_GALLERY_ITEMS
 }
 
 function isTimestamp(value: unknown): value is Timestamp {
@@ -563,7 +582,7 @@ export default function AccountOverview({
         const galleryQuery = query(
           collection(db, 'stores', storeId, 'promoGallery'),
           orderBy('sortOrder', 'asc'),
-          limit(MAX_PROMO_GALLERY_ITEMS),
+          limit(MAX_PROMO_GALLERY_QUERY_LIMIT),
         )
         const snapshot = await getDocs(galleryQuery)
         if (cancelled) return
@@ -795,6 +814,7 @@ export default function AccountOverview({
     subscriptionProfile?.status ?? profile?.contractStatus ?? profile?.status ?? null
 
   const billingPlan = subscriptionProfile?.plan ?? profile?.billingPlan ?? null
+  const maxPromoGalleryItems = getPromoGalleryLimit(billingPlan)
 
   const isTrial = contractStatus === 'trial' || billingPlan === 'trial'
 
@@ -918,9 +938,9 @@ export default function AccountOverview({
   }
 
   function handleAddPromoGalleryItem() {
-    if (promoGalleryDraft.length >= MAX_PROMO_GALLERY_ITEMS) {
+    if (promoGalleryDraft.length >= maxPromoGalleryItems) {
       publish({
-        message: `You can upload up to ${MAX_PROMO_GALLERY_ITEMS} gallery photos per store.`,
+        message: `You can upload up to ${maxPromoGalleryItems} gallery photos on your current plan.`,
         tone: 'error',
       })
       return
@@ -959,9 +979,9 @@ export default function AccountOverview({
 
   async function handleSavePromoGallery() {
     if (!storeId || !isOwner) return
-    if (promoGalleryDraft.length > MAX_PROMO_GALLERY_ITEMS) {
+    if (promoGalleryDraft.length > maxPromoGalleryItems) {
       publish({
-        message: `Save only ${MAX_PROMO_GALLERY_ITEMS} gallery photos to control storage costs.`,
+        message: `Save only ${maxPromoGalleryItems} gallery photos for your current plan.`,
         tone: 'error',
       })
       return
@@ -1025,11 +1045,12 @@ export default function AccountOverview({
       )
 
       publish({ message: 'Promo gallery saved.', tone: 'success' })
+      setPromoGalleryTab('view')
 
       const galleryQuery = query(
         collection(db, 'stores', storeId, 'promoGallery'),
         orderBy('sortOrder', 'asc'),
-        limit(MAX_PROMO_GALLERY_ITEMS),
+        limit(MAX_PROMO_GALLERY_QUERY_LIMIT),
       )
       const snapshot = await getDocs(galleryQuery)
       setPromoGalleryDraft(
@@ -2189,7 +2210,7 @@ export default function AccountOverview({
                         type="button"
                         className="button button--secondary"
                         onClick={handleAddPromoGalleryItem}
-                        disabled={promoGalleryDraft.length >= MAX_PROMO_GALLERY_ITEMS}
+                        disabled={promoGalleryDraft.length >= maxPromoGalleryItems}
                       >
                         Add image slot
                       </button>
@@ -2199,11 +2220,11 @@ export default function AccountOverview({
                         onClick={handleSavePromoGallery}
                         disabled={isSavingPromoGallery}
                       >
-                        {isSavingPromoGallery ? 'Saving gallery…' : 'Save gallery'}
+                        {isSavingPromoGallery ? 'Saving gallery…' : 'Save gallery & view images'}
                       </button>
                     </div>
                     <p className="account-overview__hint" style={{ marginTop: 0 }}>
-                      To save storage costs, each store can upload up to {MAX_PROMO_GALLERY_ITEMS} photos.
+                      Free accounts can upload 5 images, Starter 10, Growth 15, Scale 20.
                     </p>
                     {promoGalleryDraft.length === 0 && !promoGalleryLoading ? (
                       <p className="account-overview__hint">No gallery items yet. Add an image slot to begin.</p>
