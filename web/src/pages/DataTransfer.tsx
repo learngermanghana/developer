@@ -36,7 +36,7 @@ type ActionStatus = {
   message: string
 }
 
-type DataTab = 'transfer' | 'downloads'
+type DataTab = 'how-to-clear' | 'upload' | 'download'
 
 const ITEM_REQUIRED_HEADERS: HeaderSpec[] = [
   { key: 'name', description: 'Item name as it appears on receipts.' },
@@ -252,7 +252,7 @@ function getRowValue(row: string[], headerIndex: CsvHeaderIndex, key: string) {
 }
 
 export default function DataTransfer() {
-  const [activeTab, setActiveTab] = useState<DataTab>('transfer')
+  const [activeTab, setActiveTab] = useState<DataTab>('how-to-clear')
   const [selectedFile, setSelectedFile] = useState<File | null>(null)
   const [headerValidation, setHeaderValidation] = useState<CsvHeaderValidation | null>(null)
   const fileInputRef = useRef<HTMLInputElement | null>(null)
@@ -1199,27 +1199,127 @@ export default function DataTransfer() {
         <button
           type="button"
           role="tab"
-          aria-selected={activeTab === 'transfer'}
-          className={`data-transfer__tab ${activeTab === 'transfer' ? 'is-active' : ''}`}
-          onClick={() => setActiveTab('transfer')}
+          aria-selected={activeTab === 'how-to-clear'}
+          className={`data-transfer__tab ${activeTab === 'how-to-clear' ? 'is-active' : ''}`}
+          onClick={() => setActiveTab('how-to-clear')}
         >
-          Transfer data
+          How to clear step explanation
         </button>
         <button
           type="button"
           role="tab"
-          aria-selected={activeTab === 'downloads'}
-          className={`data-transfer__tab ${activeTab === 'downloads' ? 'is-active' : ''}`}
-          onClick={() => setActiveTab('downloads')}
+          aria-selected={activeTab === 'upload'}
+          className={`data-transfer__tab ${activeTab === 'upload' ? 'is-active' : ''}`}
+          onClick={() => setActiveTab('upload')}
         >
-          Download products, customers & CSV
+          Upload data
+        </button>
+        <button
+          type="button"
+          role="tab"
+          aria-selected={activeTab === 'download'}
+          className={`data-transfer__tab ${activeTab === 'download' ? 'is-active' : ''}`}
+          onClick={() => setActiveTab('download')}
+        >
+          Download data
         </button>
       </div>
 
       <div className="data-transfer__grid">
-        {activeTab === 'transfer' ? (
+        {activeTab === 'how-to-clear' ? (
+          <>
+            <section className="card data-transfer__card">
+              <h3>How to clear step explanation</h3>
+              <p className="data-transfer__muted">
+                Follow this simple flow so your import and export process stays clean every time.
+              </p>
+              <div className="data-transfer__section">
+                <h4 className="data-transfer__section-title">Step-by-step flow</h4>
+                <ol className="data-transfer__steps">
+                  <li>
+                    <span className="data-transfer__step-label">Step 1:</span>
+                    Download the correct template or export file.
+                  </li>
+                  <li>
+                    <span className="data-transfer__step-label">Step 2:</span>
+                    Keep headers exactly as shown (lowercase with underscores).
+                  </li>
+                  <li>
+                    <span className="data-transfer__step-label">Step 3:</span>
+                    Fill in your rows and save as CSV.
+                  </li>
+                  <li>
+                    <span className="data-transfer__step-label">Step 4:</span>
+                    Upload your CSV under the Upload data tab and run import.
+                  </li>
+                  <li>
+                    <span className="data-transfer__step-label">Step 5:</span>
+                    Use the Download data tab anytime you need backups or Excel copies.
+                  </li>
+                </ol>
+              </div>
+            </section>
+            <div className="data-transfer__guide" id="data-transfer-guide">
+              <section className="card data-transfer__card">
+                <h3>Items CSV headers</h3>
+                <div className="data-transfer__header-group">
+                  <div>
+                    <h4>Required</h4>
+                    <ul className="data-transfer__header-list">
+                      {itemRequired.map(header => (
+                        <li key={header.key}>
+                          <span className="data-transfer__header-key">{header.key}</span>
+                          <span className="data-transfer__header-desc">{header.description}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                  <div>
+                    <h4>Optional</h4>
+                    <ul className="data-transfer__header-list">
+                      {itemOptional.map(header => (
+                        <li key={header.key}>
+                          <span className="data-transfer__header-key">{header.key}</span>
+                          <span className="data-transfer__header-desc">{header.description}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                </div>
+              </section>
+
+              <section className="card data-transfer__card">
+                <h3>Customers CSV headers</h3>
+                <div className="data-transfer__header-group">
+                  <div>
+                    <h4>Required</h4>
+                    <ul className="data-transfer__header-list">
+                      {customerRequired.map(header => (
+                        <li key={header.key}>
+                          <span className="data-transfer__header-key">{header.key}</span>
+                          <span className="data-transfer__header-desc">{header.description}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                  <div>
+                    <h4>Optional</h4>
+                    <ul className="data-transfer__header-list">
+                      {customerOptional.map(header => (
+                        <li key={header.key}>
+                          <span className="data-transfer__header-key">{header.key}</span>
+                          <span className="data-transfer__header-desc">{header.description}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                </div>
+              </section>
+            </div>
+          </>
+        ) : activeTab === 'upload' ? (
           <section className="card data-transfer__card">
-            <h3>Transfer data</h3>
+            <h3>Upload data</h3>
             <p className="data-transfer__muted">
               Upload a CSV file with the headers below to migrate your items and customers.
             </p>
@@ -1260,9 +1360,9 @@ export default function DataTransfer() {
               <div className="data-transfer__header-summary">
                 <div className="data-transfer__header-summary-title">
                   <span>Required headers</span>
-                  <a className="data-transfer__header-toggle" href="#data-transfer-guide">
-                    Show full headers
-                  </a>
+                  <span className="data-transfer__header-toggle">
+                    See full headers in the first tab
+                  </span>
                 </div>
                 <div className="data-transfer__header-summary-list">
                   <span className="data-transfer__header-summary-label">Items:</span>
@@ -1498,68 +1598,6 @@ export default function DataTransfer() {
             </p>
           </section>
         )}
-      </div>
-
-      <div
-        className="data-transfer__guide"
-        id="data-transfer-guide"
-        hidden={activeTab !== 'transfer'}
-      >
-        <section className="card data-transfer__card">
-          <h3>Items CSV headers</h3>
-          <div className="data-transfer__header-group">
-            <div>
-              <h4>Required</h4>
-              <ul className="data-transfer__header-list">
-                {itemRequired.map(header => (
-                  <li key={header.key}>
-                    <span className="data-transfer__header-key">{header.key}</span>
-                    <span className="data-transfer__header-desc">{header.description}</span>
-                  </li>
-                ))}
-              </ul>
-            </div>
-            <div>
-              <h4>Optional</h4>
-              <ul className="data-transfer__header-list">
-                {itemOptional.map(header => (
-                  <li key={header.key}>
-                    <span className="data-transfer__header-key">{header.key}</span>
-                    <span className="data-transfer__header-desc">{header.description}</span>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          </div>
-        </section>
-
-        <section className="card data-transfer__card">
-          <h3>Customers CSV headers</h3>
-          <div className="data-transfer__header-group">
-            <div>
-              <h4>Required</h4>
-              <ul className="data-transfer__header-list">
-                {customerRequired.map(header => (
-                  <li key={header.key}>
-                    <span className="data-transfer__header-key">{header.key}</span>
-                    <span className="data-transfer__header-desc">{header.description}</span>
-                  </li>
-                ))}
-              </ul>
-            </div>
-            <div>
-              <h4>Optional</h4>
-              <ul className="data-transfer__header-list">
-                {customerOptional.map(header => (
-                  <li key={header.key}>
-                    <span className="data-transfer__header-key">{header.key}</span>
-                    <span className="data-transfer__header-desc">{header.description}</span>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          </div>
-        </section>
       </div>
     </PageSection>
   )
