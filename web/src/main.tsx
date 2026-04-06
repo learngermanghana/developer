@@ -81,6 +81,7 @@ const router = createBrowserRouter([
           { path: 'onboarding', element: <Onboarding /> },
           { path: 'staff', element: <StaffManagement /> },
           { path: 'account', element: <AccountOverview /> },
+          { path: 'account/overview', element: <AccountOverview /> },
           { path: 'public-page', element: <PublicPageSettings /> },
           { path: 'support', element: <Support /> },
         ],
