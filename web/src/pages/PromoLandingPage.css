@@ -5,19 +5,21 @@
   justify-items: center;
   gap: 16px;
   padding: 24px;
+  scroll-behavior: smooth;
   background:
     radial-gradient(circle at top, rgba(79, 70, 229, 0.18), transparent 45%),
     linear-gradient(180deg, #eef2ff 0%, #e2e8f0 100%);
 }
 
 .promo-nav {
-  width: min(920px, 100%);
   display: flex;
   flex-wrap: wrap;
   gap: 10px;
 }
 
 .promo-nav__button {
+  display: inline-flex;
+  text-decoration: none;
   border: 1px solid #c7d2fe;
   font-size: 0.9rem;
   font-weight: 600;
@@ -28,7 +30,7 @@
   cursor: pointer;
 }
 
-.promo-nav__button.is-active {
+.promo-nav__button:hover {
   background: #312e81;
   color: #fff;
   border-color: #312e81;
@@ -47,9 +49,26 @@
   gap: 22px;
   color: #0f172a;
 }
+
+.promo-site-header {
+  display: grid;
+  gap: 14px;
+  border: 1px solid #dbeafe;
+  border-radius: 16px;
+  padding: clamp(16px, 3vw, 24px);
+  background: linear-gradient(135deg, rgba(79, 70, 229, 0.08), rgba(59, 130, 246, 0.08));
+}
+
 .promo-section {
   display: grid;
   gap: 12px;
+}
+
+.promo-section--panel {
+  border: 1px solid #e2e8f0;
+  border-radius: 14px;
+  padding: clamp(14px, 2.4vw, 20px);
+  scroll-margin-top: 18px;
 }
 
 .promo-card h1 {
