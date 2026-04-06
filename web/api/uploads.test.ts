@@ -169,4 +169,23 @@ describe('uploads api', () => {
     expect(res.statusCode).toBe(400)
     expect(res.payload).toEqual({ error: 'MIME type does not match uploaded file content.' })
   })
+
+  it('accepts binary payload from rawBody when req.body is empty', async () => {
+    const req = {
+      method: 'POST',
+      headers: {
+        'content-type': 'image/png',
+        'x-upload-filename': encodeURIComponent('gallery.png'),
+        'x-upload-mimetype': 'image/png',
+      },
+      body: undefined,
+      rawBody: Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0x01]),
+    }
+    const res = createResponse()
+
+    await handler(req as any, res as any)
+
+    expect(res.statusCode).toBe(201)
+    expect(bucketFile).toHaveBeenCalledTimes(1)
+  })
 })
