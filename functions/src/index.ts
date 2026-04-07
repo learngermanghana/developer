@@ -3883,6 +3883,17 @@ function resolvePlanDefaultAmount(planKey: string | null): number {
   return 20
 }
 
+function resolveContractGrossAmount(planKey: string | null, contractMonths: number): number {
+  if (!planKey) return toTwoDecimals(resolvePlanDefaultAmount(planKey) * contractMonths)
+  const lower = planKey.toLowerCase()
+
+  if (lower.includes('scale plus') || lower.includes('scale_plus')) {
+    return 2000
+  }
+
+  return toTwoDecimals(resolvePlanDefaultAmount(planKey) * contractMonths)
+}
+
 function toTwoDecimals(value: number): number {
   return Math.round(value * 100) / 100
 }
@@ -3915,8 +3926,7 @@ function resolveContractQuote(input: {
   currentAmountPaid: number | null
   now: Date
 }) {
-  const targetPlanAmount = resolvePlanDefaultAmount(input.targetPlanKey)
-  const grossAmount = toTwoDecimals(targetPlanAmount * input.contractMonths)
+  const grossAmount = resolveContractGrossAmount(input.targetPlanKey, input.contractMonths)
 
   const isUpgrade = resolvePlanRank(input.targetPlanKey) > resolvePlanRank(input.currentPlanKey)
   if (!isUpgrade) {
