@@ -23,6 +23,8 @@ import DocumentsGenerator from './pages/DocumentsGenerator'
 import ResetPassword from './pages/ResetPassword'
 import VerifyEmail from './pages/VerifyEmail'
 import InventorySystemGhana from './pages/InventorySystemGhana'
+import InventoryManagementSoftwareGhana from './pages/InventoryManagementSoftwareGhana'
+import PricingPage from './pages/PricingPage'
 import DataTransfer from './pages/DataTransfer'
 import PromoLandingPage from './pages/PromoLandingPage'
 import PublicPageSettings from './pages/PublicPageSettings'
@@ -92,6 +94,8 @@ const router = createBrowserRouter([
       { path: 'verify-email', element: <VerifyEmail /> },
       { path: 'billing/verify', element: <BillingVerifyPage /> },
       { path: 'inventory-system-ghana', element: <InventorySystemGhana /> },
+      { path: 'inventory-management-software-ghana', element: <InventoryManagementSoftwareGhana /> },
+      { path: 'pricing', element: <PricingPage /> },
       { path: 'docs/integration-quickstart', element: <IntegrationQuickstartPage /> },
       { path: 'docs/wordpress-install-guide', element: <WordpressInstallGuidePage /> },
 
