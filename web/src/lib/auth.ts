@@ -35,9 +35,9 @@ const msalConfig = {
   cache: {
     // Use localStorage so that sessions persist across tabs and reloads.
     cacheLocation: 'localStorage' as const,
-    // Do not store the auth state in cookies unless you need legacy browser
-    // support (e.g., IE11).
-    storeAuthStateInCookie: false,
+    // Keep transient auth state in cookies so redirect callbacks do not lose
+    // state in stricter browser privacy modes.
+    storeAuthStateInCookie: true,
   },
 }
 

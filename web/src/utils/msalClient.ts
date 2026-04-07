@@ -26,7 +26,8 @@ const msalConfig = {
   },
   cache: {
     cacheLocation: 'localStorage' as const,
-    storeAuthStateInCookie: false,
+    // Helps preserve auth state across full-page callback redirects.
+    storeAuthStateInCookie: true,
   },
 }
 

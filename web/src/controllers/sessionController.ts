@@ -187,9 +187,11 @@ function setSessionCookie(value: string) {
     typeof window.location !== 'undefined' &&
     window.location.protocol === 'https:'
   const secureAttribute = isSecureContext ? '; Secure' : ''
+  const sameSiteAttribute = isSecureContext ? 'None' : 'Lax'
+  const domainAttribute = resolveCookieDomain()
   document.cookie = `${SESSION_COOKIE}=${encodeURIComponent(
     value,
-  )}; Max-Age=${SESSION_MAX_AGE_SECONDS}; Path=/; SameSite=Lax${secureAttribute}`
+  )}; Max-Age=${SESSION_MAX_AGE_SECONDS}; Path=/; SameSite=${sameSiteAttribute}${secureAttribute}${domainAttribute}`
 }
 
 function generateSessionId() {
@@ -197,4 +199,16 @@ function generateSessionId() {
     return crypto.randomUUID()
   }
   return Math.random().toString(36).slice(2) + Math.random().toString(36).slice(2)
+}
+
+function resolveCookieDomain() {
+  if (typeof window === 'undefined' || typeof window.location === 'undefined') return ''
+  const host = window.location.hostname.toLowerCase()
+  if (host === 'localhost' || /^\d{1,3}(\.\d{1,3}){3}$/.test(host)) {
+    return ''
+  }
+  if (host === 'sedifex.com' || host.endsWith('.sedifex.com')) {
+    return '; Domain=.sedifex.com'
+  }
+  return ''
 }
