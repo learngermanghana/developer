@@ -34,6 +34,13 @@ const PLANS: PlanOption[] = [
 ]
 
 const YEARLY_CONTRACT_MONTHS = 12
+const SCALE_PLUS_YEARLY_PRICE_GHS = 2000
+
+function resolveYearlyPlanAmount(plan: PlanOption | null): number | null {
+  if (!plan) return null
+  if (plan.id === 'scale_plus') return SCALE_PLUS_YEARLY_PRICE_GHS
+  return plan.monthlyAmountGhs * YEARLY_CONTRACT_MONTHS
+}
 
 export const AccountBillingSection: React.FC<Props> = ({
   storeId,
@@ -53,7 +60,7 @@ export const AccountBillingSection: React.FC<Props> = ({
   const selectedPlan = PLANS.find(plan => plan.id === selectedPlanId) ?? null
   const selectedCadenceLabel = '12 months (yearly payment)'
   const selectedCadenceDescription = 'Fixed yearly contract. No automatic recurring charge.'
-  const selectedAmount = selectedPlan ? selectedPlan.monthlyAmountGhs * YEARLY_CONTRACT_MONTHS : null
+  const selectedAmount = resolveYearlyPlanAmount(selectedPlan)
   const nextChargeDate = (() => {
     const base = new Date()
     const nextDate = new Date(base)
@@ -105,7 +112,7 @@ export const AccountBillingSection: React.FC<Props> = ({
       const response = await startPaystackCheckout({
         email: ownerEmail,
         storeId,
-        amount: targetPlan.monthlyAmountGhs * YEARLY_CONTRACT_MONTHS,
+        amount: resolveYearlyPlanAmount(targetPlan) ?? 0,
         plan: targetPlan.id,
         contractMonths: YEARLY_CONTRACT_MONTHS,
         redirectUrl,
