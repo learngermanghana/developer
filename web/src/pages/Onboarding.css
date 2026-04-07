@@ -67,6 +67,20 @@
   align-self: flex-start;
 }
 
+.onboarding-card__quick-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+}
+
+.onboarding-card__playbook {
+  margin: 0;
+  padding-left: 1.25rem;
+  color: #334155;
+  display: grid;
+  gap: 0.35rem;
+}
+
 .onboarding-card__details {
   display: grid;
   gap: 1rem;

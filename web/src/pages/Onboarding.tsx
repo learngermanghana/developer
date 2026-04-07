@@ -204,6 +204,22 @@ export default function Onboarding() {
     navigate({ pathname: '/account', hash: '#account-overview-contract' })
   }
 
+  function goToProducts() {
+    navigate('/products')
+  }
+
+  function goToCustomers() {
+    navigate('/customers')
+  }
+
+  function goToSell() {
+    navigate('/sell')
+  }
+
+  function goToPublicPage() {
+    navigate('/public-page')
+  }
+
   return (
     <div
       className="page onboarding-page"
@@ -408,6 +424,59 @@ export default function Onboarding() {
         >
           {hasCompleted ? 'Return to dashboard' : 'I’m ready to continue'}
         </button>
+      </section>
+
+      <section
+        className="card onboarding-card"
+        aria-labelledby="onboarding-step-4"
+      >
+        <header className="onboarding-card__header">
+          <span className="onboarding-card__step">Step 4</span>
+          <h2 className="onboarding-card__title" id="onboarding-step-4">
+            Launch checklist for new stores
+          </h2>
+        </header>
+        <p>
+          New stores move faster when the team practices one full sales cycle:
+          add a product, add a customer, run a sale, and confirm staff access.
+          Use these quick actions to teach your team by doing.
+        </p>
+        <div className="onboarding-card__quick-actions">
+          <button
+            type="button"
+            className="button button--primary"
+            onClick={goToProducts}
+          >
+            Add your first product
+          </button>
+          <button
+            type="button"
+            className="button button--ghost"
+            onClick={goToCustomers}
+          >
+            Add your first customer
+          </button>
+          <button
+            type="button"
+            className="button button--ghost"
+            onClick={goToSell}
+          >
+            Run a test sale
+          </button>
+          <button
+            type="button"
+            className="button button--ghost"
+            onClick={goToPublicPage}
+          >
+            Set up public page
+          </button>
+        </div>
+        <ol className="onboarding-card__playbook">
+          <li>Products: Create at least 3 real items with prices.</li>
+          <li>Customers: Add one repeat customer profile.</li>
+          <li>Sell: Complete one cash sale and one digital payment test.</li>
+          <li>Public page: Publish store details customers can find online.</li>
+        </ol>
       </section>
     </div>
   )
