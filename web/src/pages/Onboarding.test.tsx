@@ -184,4 +184,32 @@ describe('Onboarding page', () => {
       hash: '#account-overview-contract',
     })
   })
+
+  it('exposes quick actions that navigate to setup workflows', async () => {
+    const user = userEvent.setup()
+
+    render(
+      <MemoryRouter>
+        <Onboarding />
+      </MemoryRouter>,
+    )
+
+    await user.click(
+      screen.getByRole('button', { name: /add your first product/i }),
+    )
+    expect(mockNavigate).toHaveBeenCalledWith('/products')
+
+    await user.click(
+      screen.getByRole('button', { name: /add your first customer/i }),
+    )
+    expect(mockNavigate).toHaveBeenCalledWith('/customers')
+
+    await user.click(screen.getByRole('button', { name: /run a test sale/i }))
+    expect(mockNavigate).toHaveBeenCalledWith('/sell')
+
+    await user.click(
+      screen.getByRole('button', { name: /set up public page/i }),
+    )
+    expect(mockNavigate).toHaveBeenCalledWith('/public-page')
+  })
 })
