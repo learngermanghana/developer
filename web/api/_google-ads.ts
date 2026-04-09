@@ -1,4 +1,4 @@
-import { randomBytes, createHash } from 'node:crypto'
+import { randomBytes, createHash, createCipheriv, createDecipheriv } from 'node:crypto'
 import { FieldValue, Timestamp } from 'firebase-admin/firestore'
 import { db } from './_firebase-admin.js'
 
@@ -10,6 +10,9 @@ const GOOGLE_SCOPES = [
   'email',
   'profile',
 ]
+
+const GOOGLE_ADS_API_BASE = 'https://googleads.googleapis.com'
+const GOOGLE_ADS_API_VERSION = process.env.GOOGLE_ADS_API_VERSION?.trim() || 'v18'
 
 export type CampaignGoal = 'leads' | 'sales' | 'traffic' | 'calls' | 'awareness'
 export type CampaignStatus = 'draft' | 'live' | 'paused'
@@ -23,8 +26,75 @@ export type CampaignBrief = {
   description: string
 }
 
+type GoogleAdsSecretsCipher = {
+  keyVersion: string
+  iv: string
+  authTag: string
+  cipherText: string
+}
+
+type GoogleAdsIntegrationDoc = {
+  refreshToken?: string
+  accessToken?: string
+  tokenType?: string
+  scope?: string
+  expiresAt?: Timestamp | { toMillis?: () => number } | null
+  secrets?: {
+    refreshTokenCipher?: GoogleAdsSecretsCipher
+    accessTokenCipher?: GoogleAdsSecretsCipher
+  }
+  customerId?: string
+  managerId?: string
+}
+
 function hashSecret(value: string): string {
   return createHash('sha256').update(value).digest('hex')
+}
+
+function getEncryptionKey(): { key: Buffer; keyVersion: string } {
+  const raw = process.env.GOOGLE_ADS_TOKEN_ENCRYPTION_KEY?.trim() || ''
+  if (!raw) {
+    throw new Error('GOOGLE_ADS_TOKEN_ENCRYPTION_KEY is required')
+  }
+
+  const key = Buffer.from(raw, 'base64')
+  if (key.length !== 32) {
+    throw new Error('GOOGLE_ADS_TOKEN_ENCRYPTION_KEY must decode to 32 bytes (base64)')
+  }
+
+  return {
+    key,
+    keyVersion: process.env.GOOGLE_ADS_TOKEN_ENCRYPTION_KEY_VERSION?.trim() || 'v1',
+  }
+}
+
+function encryptToken(value: string): GoogleAdsSecretsCipher {
+  const { key, keyVersion } = getEncryptionKey()
+  const iv = randomBytes(12)
+  const cipher = createCipheriv('aes-256-gcm', key, iv)
+  const encrypted = Buffer.concat([cipher.update(value, 'utf8'), cipher.final()])
+  const authTag = cipher.getAuthTag()
+
+  return {
+    keyVersion,
+    iv: iv.toString('base64'),
+    authTag: authTag.toString('base64'),
+    cipherText: encrypted.toString('base64'),
+  }
+}
+
+function decryptToken(payload: GoogleAdsSecretsCipher | undefined): string {
+  if (!payload) return ''
+  const { key } = getEncryptionKey()
+
+  const decipher = createDecipheriv('aes-256-gcm', key, Buffer.from(payload.iv, 'base64'))
+  decipher.setAuthTag(Buffer.from(payload.authTag, 'base64'))
+  const decrypted = Buffer.concat([
+    decipher.update(Buffer.from(payload.cipherText, 'base64')),
+    decipher.final(),
+  ])
+
+  return decrypted.toString('utf8')
 }
 
 export function getOAuthClientConfig() {
@@ -146,6 +216,13 @@ export async function exchangeCodeForTokens(code: string) {
   return payload
 }
 
+function parseTokenExpiry(payload: Record<string, unknown>): Timestamp | null {
+  const expiresIn =
+    typeof payload.expires_in === 'number' ? payload.expires_in : Number(payload.expires_in || 0)
+
+  return expiresIn > 0 ? Timestamp.fromMillis(Date.now() + expiresIn * 1000) : null
+}
+
 export async function storeGoogleTokens(params: {
   storeId: string
   uid: string
@@ -158,10 +235,6 @@ export async function storeGoogleTokens(params: {
   const accessToken = typeof params.tokenPayload.access_token === 'string' ? params.tokenPayload.access_token : ''
   const refreshToken = typeof params.tokenPayload.refresh_token === 'string' ? params.tokenPayload.refresh_token : ''
   const scope = typeof params.tokenPayload.scope === 'string' ? params.tokenPayload.scope : ''
-  const expiresIn =
-    typeof params.tokenPayload.expires_in === 'number'
-      ? params.tokenPayload.expires_in
-      : Number(params.tokenPayload.expires_in || 0)
 
   if (!accessToken || !tokenType) {
     throw new Error('missing-access-token')
@@ -180,22 +253,26 @@ export async function storeGoogleTokens(params: {
           tokenScope: scope,
           tokenType,
           tokenUpdatedAt: FieldValue.serverTimestamp(),
-          tokenExpiresAt: expiresIn > 0 ? Timestamp.fromMillis(Date.now() + expiresIn * 1000) : null,
+          tokenExpiresAt: parseTokenExpiry(params.tokenPayload),
           oauthUserId: params.uid,
         },
       },
       integrations: {
         googleAds: {
-          accessToken,
-          refreshToken,
+          secrets: {
+            accessTokenCipher: encryptToken(accessToken),
+            refreshTokenCipher: refreshToken ? encryptToken(refreshToken) : FieldValue.delete(),
+          },
           tokenType,
           scope,
-          expiresAt: expiresIn > 0 ? Timestamp.fromMillis(Date.now() + expiresIn * 1000) : null,
+          expiresAt: parseTokenExpiry(params.tokenPayload),
           updatedAt: FieldValue.serverTimestamp(),
           connectedByUid: params.uid,
           connectedEmail: params.email,
           customerId: params.customerId,
           managerId: params.managerId || '',
+          accessToken: FieldValue.delete(),
+          refreshToken: FieldValue.delete(),
         },
       },
     },
@@ -256,4 +333,295 @@ export async function refreshGoogleAccessToken(refreshToken: string): Promise<Re
   }
 
   return payload
+}
+
+function toMillis(value: GoogleAdsIntegrationDoc['expiresAt']): number {
+  if (!value || typeof value.toMillis !== 'function') return 0
+  return value.toMillis()
+}
+
+export async function getGoogleAdsAuthContext(storeId: string): Promise<{
+  customerId: string
+  managerId: string
+  accessToken: string
+}> {
+  const settingsRef = db().doc(`storeSettings/${storeId}`)
+  const snap = await settingsRef.get()
+  const data = (snap.data() ?? {}) as Record<string, any>
+  const googleAds = (data.integrations?.googleAds ?? {}) as GoogleAdsIntegrationDoc
+
+  const customerId = typeof googleAds.customerId === 'string' ? googleAds.customerId.trim() : ''
+  const managerId = typeof googleAds.managerId === 'string' ? googleAds.managerId.trim() : ''
+  let accessToken = decryptToken(googleAds.secrets?.accessTokenCipher)
+  let refreshToken = decryptToken(googleAds.secrets?.refreshTokenCipher)
+
+  if (!accessToken && typeof googleAds.accessToken === 'string') {
+    accessToken = googleAds.accessToken
+  }
+  if (!refreshToken && typeof googleAds.refreshToken === 'string') {
+    refreshToken = googleAds.refreshToken
+  }
+
+  if (!customerId || !accessToken) {
+    throw new Error('google-ads-not-connected')
+  }
+
+  const expired = toMillis(googleAds.expiresAt) <= Date.now() + 15_000
+  if (expired) {
+    if (!refreshToken) throw new Error('google-ads-refresh-token-missing')
+
+    const refreshed = await refreshGoogleAccessToken(refreshToken)
+    accessToken = typeof refreshed.access_token === 'string' ? refreshed.access_token : accessToken
+    const refreshedType = typeof refreshed.token_type === 'string' ? refreshed.token_type : 'Bearer'
+    const refreshedScope = typeof refreshed.scope === 'string' ? refreshed.scope : googleAds.scope || ''
+
+    await settingsRef.set(
+      {
+        integrations: {
+          googleAds: {
+            secrets: {
+              accessTokenCipher: encryptToken(accessToken),
+              refreshTokenCipher: encryptToken(refreshToken),
+            },
+            tokenType: refreshedType,
+            scope: refreshedScope,
+            expiresAt: parseTokenExpiry(refreshed),
+            updatedAt: FieldValue.serverTimestamp(),
+            accessToken: FieldValue.delete(),
+            refreshToken: FieldValue.delete(),
+          },
+        },
+      },
+      { merge: true },
+    )
+  }
+
+  return { customerId, managerId, accessToken }
+}
+
+function normalizeCustomerId(customerId: string): string {
+  return customerId.replace(/-/g, '').trim()
+}
+
+function googleAdsHeaders(params: { accessToken: string; managerId: string }) {
+  const developerToken = process.env.GOOGLE_ADS_DEVELOPER_TOKEN?.trim() || ''
+  if (!developerToken) throw new Error('GOOGLE_ADS_DEVELOPER_TOKEN is required')
+
+  const headers: Record<string, string> = {
+    authorization: `Bearer ${params.accessToken}`,
+    'developer-token': developerToken,
+    'content-type': 'application/json',
+  }
+
+  if (params.managerId) {
+    headers['login-customer-id'] = normalizeCustomerId(params.managerId)
+  }
+
+  return headers
+}
+
+export async function googleAdsMutate(params: {
+  customerId: string
+  managerId: string
+  accessToken: string
+  operations: Array<Record<string, unknown>>
+}): Promise<Record<string, unknown>> {
+  const customerId = normalizeCustomerId(params.customerId)
+  const url = `${GOOGLE_ADS_API_BASE}/${GOOGLE_ADS_API_VERSION}/customers/${customerId}/googleAds:mutate`
+
+  const response = await fetch(url, {
+    method: 'POST',
+    headers: googleAdsHeaders({ accessToken: params.accessToken, managerId: params.managerId }),
+    body: JSON.stringify({ mutateOperations: params.operations }),
+  })
+
+  const payload = (await response.json()) as Record<string, unknown>
+  if (!response.ok) {
+    throw new Error(
+      `google-ads-mutate-failed:${typeof payload.message === 'string' ? payload.message : response.status}`,
+    )
+  }
+
+  return payload
+}
+
+function parseResourceName(value: unknown): string {
+  return typeof value === 'string' ? value : ''
+}
+
+export async function createGoogleAdsCampaign(params: {
+  customerId: string
+  managerId: string
+  accessToken: string
+  brief: CampaignBrief
+  campaignName: string
+}): Promise<{ campaignId: string; adGroupName: string }> {
+  const normalizedCustomerId = normalizeCustomerId(params.customerId)
+  const micros = Math.max(1_000_000, Math.round(params.brief.dailyBudget * 1_000_000))
+  const campaignName = params.campaignName.slice(0, 120)
+  const adGroupName = `${params.brief.goal.toUpperCase()} Primary`.slice(0, 120)
+
+  const payload = await googleAdsMutate({
+    customerId: params.customerId,
+    managerId: params.managerId,
+    accessToken: params.accessToken,
+    operations: [
+      {
+        campaignBudgetOperation: {
+          create: {
+            name: `${campaignName} Budget`,
+            amountMicros: micros.toString(),
+            deliveryMethod: 'STANDARD',
+          },
+        },
+      },
+      {
+        campaignOperation: {
+          create: {
+            name: campaignName,
+            status: 'ENABLED',
+            advertisingChannelType: 'SEARCH',
+            manualCpc: {},
+            campaignBudget: `customers/${normalizedCustomerId}/campaignBudgets/-1`,
+          },
+        },
+      },
+      {
+        adGroupOperation: {
+          create: {
+            name: adGroupName,
+            campaign: `customers/${normalizedCustomerId}/campaigns/-2`,
+            cpcBidMicros: '1000000',
+            status: 'ENABLED',
+            type: 'SEARCH_STANDARD',
+          },
+        },
+      },
+      {
+        adGroupAdOperation: {
+          create: {
+            adGroup: `customers/${normalizedCustomerId}/adGroups/-3`,
+            status: 'ENABLED',
+            ad: {
+              finalUrls: [params.brief.landingPageUrl],
+              responsiveSearchAd: {
+                headlines: [{ text: params.brief.headline }],
+                descriptions: [{ text: params.brief.description }],
+              },
+            },
+          },
+        },
+      },
+    ],
+  })
+
+  const mutateResponses = Array.isArray(payload.mutateOperationResponses)
+    ? payload.mutateOperationResponses
+    : []
+
+  const campaignResourceName = parseResourceName(
+    (mutateResponses[1] as Record<string, any> | undefined)?.campaignResult?.resourceName,
+  )
+
+  const match = campaignResourceName.match(/\/campaigns\/(\d+)/)
+  const campaignId = match?.[1] || campaignResourceName || `SFX-${Date.now().toString().slice(-6)}`
+
+  return {
+    campaignId,
+    adGroupName,
+  }
+}
+
+function buildCampaignResource(customerId: string, campaignId: string): string {
+  const normalizedCustomer = normalizeCustomerId(customerId)
+  return campaignId.startsWith('customers/')
+    ? campaignId
+    : `customers/${normalizedCustomer}/campaigns/${campaignId}`
+}
+
+export async function updateGoogleAdsCampaignStatus(params: {
+  customerId: string
+  managerId: string
+  accessToken: string
+  campaignId: string
+  enabled: boolean
+}) {
+  const resourceName = buildCampaignResource(params.customerId, params.campaignId)
+
+  await googleAdsMutate({
+    customerId: params.customerId,
+    managerId: params.managerId,
+    accessToken: params.accessToken,
+    operations: [
+      {
+        campaignOperation: {
+          update: {
+            resourceName,
+            status: params.enabled ? 'ENABLED' : 'PAUSED',
+          },
+          updateMask: 'status',
+        },
+      },
+    ],
+  })
+}
+
+export async function fetchGoogleAdsCampaignMetrics(params: {
+  customerId: string
+  managerId: string
+  accessToken: string
+  campaignId?: string
+}): Promise<{ spend: number; leads: number; cpa: number | null }> {
+  const customerId = normalizeCustomerId(params.customerId)
+  const url = `${GOOGLE_ADS_API_BASE}/${GOOGLE_ADS_API_VERSION}/customers/${customerId}/googleAds:searchStream`
+
+  const whereCampaign = params.campaignId
+    ? ` AND campaign.id = ${params.campaignId.replace(/\D/g, '') || '0'}`
+    : ''
+
+  const query = `
+    SELECT
+      metrics.cost_micros,
+      metrics.conversions
+    FROM campaign
+    WHERE campaign.status != REMOVED${whereCampaign}
+    DURING LAST_30_DAYS
+  `.replace(/\s+/g, ' ')
+
+  const response = await fetch(url, {
+    method: 'POST',
+    headers: googleAdsHeaders({ accessToken: params.accessToken, managerId: params.managerId }),
+    body: JSON.stringify({ query }),
+  })
+
+  const payload = (await response.json()) as Array<Record<string, any>> | Record<string, unknown>
+  if (!response.ok) {
+    const message = Array.isArray(payload)
+      ? JSON.stringify(payload[0] || {})
+      : typeof (payload as Record<string, unknown>).message === 'string'
+        ? ((payload as Record<string, unknown>).message as string)
+        : response.status.toString()
+    throw new Error(`google-ads-metrics-failed:${message}`)
+  }
+
+  const batches = Array.isArray(payload) ? payload : []
+  let spend = 0
+  let leads = 0
+
+  for (const batch of batches) {
+    const results = Array.isArray(batch.results) ? batch.results : []
+    for (const result of results) {
+      const metrics = (result.metrics ?? {}) as Record<string, unknown>
+      const costMicros = Number(metrics.costMicros ?? metrics.cost_micros ?? 0)
+      const conversions = Number(metrics.conversions ?? 0)
+      if (Number.isFinite(costMicros)) spend += costMicros / 1_000_000
+      if (Number.isFinite(conversions)) leads += conversions
+    }
+  }
+
+  return {
+    spend: Number(spend.toFixed(2)),
+    leads: Number(leads.toFixed(2)),
+    cpa: leads > 0 ? Number((spend / leads).toFixed(2)) : null,
+  }
 }

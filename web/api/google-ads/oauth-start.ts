@@ -5,7 +5,7 @@ import {
   requireCustomerId,
   requireStoreId,
 } from '../_google-ads.js'
-import { requireApiUser } from '../_api-auth.js'
+import { requireApiUser, requireStoreMembership } from '../_api-auth.js'
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== 'POST') {
@@ -15,6 +15,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   try {
     const user = await requireApiUser(req)
     const storeId = requireStoreId(req.body?.storeId)
+    await requireStoreMembership(user.uid, storeId)
     const customerId = requireCustomerId(req.body?.customerId)
     const managerId =
       typeof req.body?.managerId === 'string' ? req.body.managerId.trim() : ''
@@ -36,6 +37,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const message = error instanceof Error ? error.message : 'oauth-start-failed'
     if (message === 'missing-auth' || message === 'invalid-auth') {
       return res.status(401).json({ error: 'Unauthorized' })
+    }
+    if (message === 'store-access-denied') {
+      return res.status(403).json({ error: 'Forbidden' })
     }
 
     return res.status(400).json({ error: message })
