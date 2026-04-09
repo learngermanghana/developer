@@ -247,10 +247,9 @@ export default function AdsCampaigns() {
     }
   }
 
-  async function handleConnectSubmit(event: React.FormEvent<HTMLFormElement>) {
-    event.preventDefault()
-    if (!settings.connection.accountEmail.trim() || !settings.connection.customerId.trim()) {
-      setNotice('Add the Google Ads account email and customer ID first.')
+  async function handleConnectClick() {
+    if (!settings.connection.accountEmail.trim()) {
+      setNotice('Add the Google account email first.')
       return
     }
 
@@ -262,7 +261,6 @@ export default function AdsCampaigns() {
       const { url } = await beginGoogleAdsOAuth({
         storeId,
         accountEmail: settings.connection.accountEmail,
-        customerId: settings.connection.customerId,
         managerId: settings.connection.managerId,
       })
       window.location.assign(url)
@@ -274,8 +272,7 @@ export default function AdsCampaigns() {
     }
   }
 
-  async function handleBillingConfirm(event: React.FormEvent<HTMLFormElement>) {
-    event.preventDefault()
+  async function handleBillingConfirmClick() {
     if (!settings.billing.legalName.trim()) {
       setNotice('Enter the business legal name used for billing.')
       return
@@ -406,7 +403,12 @@ export default function AdsCampaigns() {
           </label>
 
           <div className="ads-campaigns__actions">
-            <button type="submit" className="button button--primary" disabled={saving}>
+            <button
+              type="button"
+              className="button button--primary"
+              disabled={saving}
+              onClick={handleConnectClick}
+            >
               {settings.connection.connected ? 'Update connection' : 'Connect Google Ads'}
             </button>
             <p>
@@ -414,7 +416,7 @@ export default function AdsCampaigns() {
               {toIso(settings.connection.connectedAt)}
             </p>
           </div>
-        </form>
+        </div>
       </section>
 
       <section className="ads-campaigns__section" aria-labelledby="billing-ownership">
@@ -441,7 +443,12 @@ export default function AdsCampaigns() {
             />
           </label>
           <div className="ads-campaigns__actions">
-            <button type="submit" className="button button--primary" disabled={saving}>
+            <button
+              type="button"
+              className="button button--primary"
+              disabled={saving}
+              onClick={handleBillingConfirmClick}
+            >
               Confirm billing ownership
             </button>
             <p>
@@ -449,7 +456,7 @@ export default function AdsCampaigns() {
               {toIso(settings.billing.confirmedAt)}
             </p>
           </div>
-        </form>
+        </div>
       </section>
 
       <section className="ads-campaigns__section" aria-labelledby="campaign-brief">
