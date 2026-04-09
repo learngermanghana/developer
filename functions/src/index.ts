@@ -111,6 +111,41 @@ type StartTikTokConnectPayload = {
   storeId?: unknown
 }
 
+type StartGoogleAdsOAuthPayload = {
+  storeId?: unknown
+  redirectUri?: unknown
+}
+
+type ConnectGoogleAdsAccountPayload = {
+  storeId?: unknown
+  accountEmail?: unknown
+  customerId?: unknown
+  managerId?: unknown
+  authorizationCode?: unknown
+  redirectUri?: unknown
+}
+
+type UpsertGoogleAdsCampaignBriefPayload = {
+  storeId?: unknown
+  brief?: unknown
+}
+
+type UpsertGoogleAdsBillingPayload = {
+  storeId?: unknown
+  legalName?: unknown
+}
+
+type UpdateGoogleAdsCampaignStatusPayload = {
+  storeId?: unknown
+  status?: unknown
+}
+
+type UpsertGoogleAdsMetricsPayload = {
+  storeId?: unknown
+  spend?: unknown
+  leads?: unknown
+}
+
 const VALID_ROLES = new Set(['owner', 'staff'])
 const TRIAL_DAYS = 14
 const GRACE_DAYS = 7
@@ -118,6 +153,9 @@ const MILLIS_PER_DAY = 1000 * 60 * 60 * 24
 const BULK_MESSAGE_LIMIT = 1000
 const BULK_MESSAGE_BATCH_LIMIT = 200
 const SMS_SEGMENT_SIZE = 160
+const GOOGLE_ADS_CLIENT_ID = defineString('GOOGLE_ADS_CLIENT_ID')
+const GOOGLE_ADS_CLIENT_SECRET = defineString('GOOGLE_ADS_CLIENT_SECRET')
+const GOOGLE_ADS_REDIRECT_URI = defineString('GOOGLE_ADS_REDIRECT_URI')
 /** ============================================================================
  *  HELPERS
  * ==========================================================================*/
@@ -508,6 +546,89 @@ function normalizeListProductsPayload(data: ListStoreProductsPayload | undefined
       : 200
   const limit = Math.min(Math.max(requestedLimit, 1), 500)
   return { storeId, limit }
+}
+
+function normalizeGoogleAdsStoreId(data: { storeId?: unknown }) {
+  const storeId = typeof data.storeId === 'string' ? data.storeId.trim() : ''
+  if (!storeId) {
+    throw new functions.https.HttpsError('invalid-argument', 'A storeId is required')
+  }
+  return storeId
+}
+
+function normalizeGoogleAdsConnectPayload(data: ConnectGoogleAdsAccountPayload) {
+  const storeId = normalizeGoogleAdsStoreId(data)
+  const accountEmail = typeof data.accountEmail === 'string' ? data.accountEmail.trim().toLowerCase() : ''
+  const customerIdRaw = typeof data.customerId === 'string' ? data.customerId.trim() : ''
+  const managerIdRaw = typeof data.managerId === 'string' ? data.managerId.trim() : ''
+  const authorizationCode =
+    typeof data.authorizationCode === 'string' ? data.authorizationCode.trim() : ''
+  const redirectUri = typeof data.redirectUri === 'string' ? data.redirectUri.trim() : ''
+
+  if (!accountEmail) {
+    throw new functions.https.HttpsError('invalid-argument', 'Google account email is required')
+  }
+  if (!customerIdRaw) {
+    throw new functions.https.HttpsError('invalid-argument', 'Google Ads customer ID is required')
+  }
+
+  const customerId = customerIdRaw.replace(/[^\d]/g, '')
+  const managerId = managerIdRaw.replace(/[^\d]/g, '')
+  if (customerId.length < 10) {
+    throw new functions.https.HttpsError('invalid-argument', 'Google Ads customer ID is invalid')
+  }
+
+  return { storeId, accountEmail, customerId, managerId, authorizationCode, redirectUri }
+}
+
+function normalizeGoogleAdsBriefPayload(data: UpsertGoogleAdsCampaignBriefPayload) {
+  const storeId = normalizeGoogleAdsStoreId(data)
+  const brief = (data.brief ?? {}) as Record<string, unknown>
+  const goal = typeof brief.goal === 'string' ? brief.goal.trim().toLowerCase() : 'leads'
+  const location = typeof brief.location === 'string' ? brief.location.trim() : ''
+  const landingPageUrl = typeof brief.landingPageUrl === 'string' ? brief.landingPageUrl.trim() : ''
+  const headline = typeof brief.headline === 'string' ? brief.headline.trim() : ''
+  const description = typeof brief.description === 'string' ? brief.description.trim() : ''
+  const budgetRaw =
+    typeof brief.dailyBudget === 'number' ? brief.dailyBudget : Number(brief.dailyBudget)
+  const dailyBudget = Number.isFinite(budgetRaw) ? Math.max(1, Number(budgetRaw)) : 1
+
+  const allowedGoals = new Set(['leads', 'sales', 'traffic', 'calls', 'awareness'])
+  return {
+    storeId,
+    brief: {
+      goal: allowedGoals.has(goal) ? goal : 'leads',
+      location,
+      landingPageUrl,
+      headline,
+      description,
+      dailyBudget,
+    },
+  }
+}
+
+function normalizeGoogleAdsBillingPayload(data: UpsertGoogleAdsBillingPayload) {
+  const storeId = normalizeGoogleAdsStoreId(data)
+  const legalName = typeof data.legalName === 'string' ? data.legalName.trim() : ''
+  if (!legalName) {
+    throw new functions.https.HttpsError('invalid-argument', 'Business legal name is required')
+  }
+  return { storeId, legalName }
+}
+
+async function writeGoogleAdsAutomation(
+  storeId: string,
+  payload: Record<string, unknown>,
+) {
+  await db.collection('storeSettings').doc(storeId).set(
+    {
+      googleAdsAutomation: {
+        ...payload,
+        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      },
+    },
+    { merge: true },
+  )
 }
 
 function timestampDaysFromNow(days: number) {
@@ -4533,6 +4654,244 @@ export const createBulkCreditsCheckout = functions.https.onCall(
       package: packageKey,
       credits: pkg.credits,
     }
+  },
+)
+
+export const startGoogleAdsOAuth = functions.https.onCall(
+  async (rawData: unknown, context) => {
+    assertOwnerAccess(context)
+    const data = (rawData ?? {}) as StartGoogleAdsOAuthPayload
+    const storeId = normalizeGoogleAdsStoreId(data)
+    await verifyOwnerForStore(context.auth!.uid, storeId)
+
+    const clientId = GOOGLE_ADS_CLIENT_ID.value().trim()
+    const redirectUri =
+      (typeof data.redirectUri === 'string' && data.redirectUri.trim()) ||
+      GOOGLE_ADS_REDIRECT_URI.value().trim()
+
+    if (!clientId || !redirectUri) {
+      throw new functions.https.HttpsError(
+        'failed-precondition',
+        'Google Ads OAuth is not configured. Missing client id or redirect URI.',
+      )
+    }
+
+    const statePayload = `${storeId}:${context.auth!.uid}:${Date.now()}`
+    const state = Buffer.from(statePayload, 'utf8').toString('base64url')
+    const authUrl = new URL('https://accounts.google.com/o/oauth2/v2/auth')
+    authUrl.searchParams.set('client_id', clientId)
+    authUrl.searchParams.set('redirect_uri', redirectUri)
+    authUrl.searchParams.set('response_type', 'code')
+    authUrl.searchParams.set('scope', 'https://www.googleapis.com/auth/adwords')
+    authUrl.searchParams.set('access_type', 'offline')
+    authUrl.searchParams.set('prompt', 'consent')
+    authUrl.searchParams.set('state', state)
+
+    await writeGoogleAdsAutomation(storeId, {
+      oauth: {
+        state,
+        redirectUri,
+        startedAt: admin.firestore.FieldValue.serverTimestamp(),
+      },
+    })
+
+    return { ok: true, authUrl: authUrl.toString(), state, redirectUri }
+  },
+)
+
+export const connectGoogleAdsAccount = functions.https.onCall(
+  async (rawData: unknown, context) => {
+    assertOwnerAccess(context)
+    const payload = normalizeGoogleAdsConnectPayload((rawData ?? {}) as ConnectGoogleAdsAccountPayload)
+    await verifyOwnerForStore(context.auth!.uid, payload.storeId)
+
+    let tokenStored = false
+    if (payload.authorizationCode) {
+      const clientId = GOOGLE_ADS_CLIENT_ID.value().trim()
+      const clientSecret = GOOGLE_ADS_CLIENT_SECRET.value().trim()
+      const redirectUri = payload.redirectUri || GOOGLE_ADS_REDIRECT_URI.value().trim()
+
+      if (!clientId || !clientSecret || !redirectUri) {
+        throw new functions.https.HttpsError(
+          'failed-precondition',
+          'Google Ads OAuth credentials are missing on the backend.',
+        )
+      }
+
+      const tokenResponse = await fetch('https://oauth2.googleapis.com/token', {
+        method: 'POST',
+        headers: { 'content-type': 'application/x-www-form-urlencoded' },
+        body: new URLSearchParams({
+          code: payload.authorizationCode,
+          client_id: clientId,
+          client_secret: clientSecret,
+          redirect_uri: redirectUri,
+          grant_type: 'authorization_code',
+        }).toString(),
+      })
+
+      if (!tokenResponse.ok) {
+        const responseText = await tokenResponse.text()
+        throw new functions.https.HttpsError(
+          'invalid-argument',
+          `OAuth code exchange failed: ${responseText.slice(0, 180)}`,
+        )
+      }
+
+      const tokenJson = (await tokenResponse.json()) as Record<string, unknown>
+      await db.collection('googleAdsConnections').doc(payload.storeId).set(
+        {
+          storeId: payload.storeId,
+          accountEmail: payload.accountEmail,
+          customerId: payload.customerId,
+          managerId: payload.managerId || null,
+          accessToken:
+            typeof tokenJson.access_token === 'string' ? tokenJson.access_token : null,
+          refreshToken:
+            typeof tokenJson.refresh_token === 'string' ? tokenJson.refresh_token : null,
+          scope: typeof tokenJson.scope === 'string' ? tokenJson.scope : null,
+          tokenType: typeof tokenJson.token_type === 'string' ? tokenJson.token_type : null,
+          expiresIn:
+            typeof tokenJson.expires_in === 'number' ? tokenJson.expires_in : null,
+          connectedBy: context.auth!.uid,
+          connectedAt: admin.firestore.FieldValue.serverTimestamp(),
+          updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        },
+        { merge: true },
+      )
+      tokenStored = true
+    }
+
+    await writeGoogleAdsAutomation(payload.storeId, {
+      connection: {
+        connected: true,
+        accountEmail: payload.accountEmail,
+        customerId: payload.customerId,
+        managerId: payload.managerId,
+        connectedAt: admin.firestore.FieldValue.serverTimestamp(),
+      },
+    })
+
+    return { ok: true, connected: true, tokenStored }
+  },
+)
+
+export const upsertGoogleAdsCampaignBrief = functions.https.onCall(
+  async (rawData: unknown, context) => {
+    assertOwnerAccess(context)
+    const { storeId, brief } = normalizeGoogleAdsBriefPayload(
+      (rawData ?? {}) as UpsertGoogleAdsCampaignBriefPayload,
+    )
+    await verifyOwnerForStore(context.auth!.uid, storeId)
+    await writeGoogleAdsAutomation(storeId, { brief })
+    return { ok: true }
+  },
+)
+
+export const upsertGoogleAdsBilling = functions.https.onCall(
+  async (rawData: unknown, context) => {
+    assertOwnerAccess(context)
+    const { storeId, legalName } = normalizeGoogleAdsBillingPayload(
+      (rawData ?? {}) as UpsertGoogleAdsBillingPayload,
+    )
+    await verifyOwnerForStore(context.auth!.uid, storeId)
+
+    await writeGoogleAdsAutomation(storeId, {
+      billing: {
+        confirmed: true,
+        legalName,
+        confirmedAt: admin.firestore.FieldValue.serverTimestamp(),
+      },
+    })
+    return { ok: true }
+  },
+)
+
+export const launchGoogleAdsCampaign = functions.https.onCall(
+  async (rawData: unknown, context) => {
+    assertOwnerAccess(context)
+    const storeId = normalizeGoogleAdsStoreId((rawData ?? {}) as { storeId?: unknown })
+    await verifyOwnerForStore(context.auth!.uid, storeId)
+
+    const campaignId = `SFX-${Date.now().toString().slice(-6)}`
+    const adGroupName = 'PRIMARY-AD-GROUP'
+
+    await writeGoogleAdsAutomation(storeId, {
+      campaign: {
+        status: 'live',
+        campaignId,
+        adGroupName,
+        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      },
+    })
+
+    await db.collection('stores').doc(storeId).collection('adsJobs').add({
+      kind: 'launch_campaign',
+      provider: 'google_ads',
+      status: 'queued',
+      campaignId,
+      createdBy: context.auth!.uid,
+      createdAt: admin.firestore.FieldValue.serverTimestamp(),
+    })
+
+    return { ok: true, campaignId, adGroupName, status: 'live' }
+  },
+)
+
+export const updateGoogleAdsCampaignStatus = functions.https.onCall(
+  async (rawData: unknown, context) => {
+    assertOwnerAccess(context)
+    const data = (rawData ?? {}) as UpdateGoogleAdsCampaignStatusPayload
+    const storeId = normalizeGoogleAdsStoreId(data)
+    await verifyOwnerForStore(context.auth!.uid, storeId)
+
+    const rawStatus = typeof data.status === 'string' ? data.status.trim().toLowerCase() : ''
+    const status = rawStatus === 'paused' ? 'paused' : rawStatus === 'live' ? 'live' : null
+    if (!status) {
+      throw new functions.https.HttpsError('invalid-argument', 'Status must be live or paused')
+    }
+
+    await writeGoogleAdsAutomation(storeId, {
+      campaign: {
+        status,
+        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      },
+    })
+
+    await db.collection('stores').doc(storeId).collection('adsJobs').add({
+      kind: status === 'paused' ? 'pause_campaign' : 'resume_campaign',
+      provider: 'google_ads',
+      status: 'queued',
+      createdBy: context.auth!.uid,
+      createdAt: admin.firestore.FieldValue.serverTimestamp(),
+    })
+
+    return { ok: true, status }
+  },
+)
+
+export const upsertGoogleAdsMetrics = functions.https.onCall(
+  async (rawData: unknown, context) => {
+    assertOwnerAccess(context)
+    const data = (rawData ?? {}) as UpsertGoogleAdsMetricsPayload
+    const storeId = normalizeGoogleAdsStoreId(data)
+    await verifyOwnerForStore(context.auth!.uid, storeId)
+
+    const spendRaw = typeof data.spend === 'number' ? data.spend : Number(data.spend)
+    const leadsRaw = typeof data.leads === 'number' ? data.leads : Number(data.leads)
+    const spend = Number.isFinite(spendRaw) ? Math.max(0, spendRaw) : 0
+    const leads = Number.isFinite(leadsRaw) ? Math.max(0, Math.round(leadsRaw)) : 0
+    const cpa = leads > 0 ? Number((spend / leads).toFixed(2)) : 0
+
+    await writeGoogleAdsAutomation(storeId, {
+      metrics: {
+        spend,
+        leads,
+        cpa,
+        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      },
+    })
+    return { ok: true, spend, leads, cpa }
   },
 )
 
