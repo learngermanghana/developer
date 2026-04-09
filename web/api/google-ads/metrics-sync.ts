@@ -1,19 +1,7 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node'
 import { FieldValue } from 'firebase-admin/firestore'
 import { db } from '../_firebase-admin.js'
-import { refreshGoogleAccessToken } from '../_google-ads.js'
-
-type GoogleAdsIntegrationDoc = {
-  refreshToken?: string
-  accessToken?: string
-  tokenType?: string
-  expiresAt?: { toMillis?: () => number } | null
-}
-
-function isExpired(expiresAt: GoogleAdsIntegrationDoc['expiresAt']): boolean {
-  if (!expiresAt || typeof expiresAt.toMillis !== 'function') return true
-  return expiresAt.toMillis() <= Date.now() + 15_000
-}
+import { fetchGoogleAdsCampaignMetrics, getGoogleAdsAuthContext } from '../_google-ads.js'
 
 function requireCronSecret(req: VercelRequest) {
   const expected = process.env.GOOGLE_ADS_SYNC_SECRET?.trim() || ''
@@ -47,58 +35,56 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       scanned += 1
 
       const storeId = docSnap.id
-      const integrationRef = db().doc(`storeSettings/${storeId}`)
-      const integrationSnap = await integrationRef.get()
-      const integrationData = integrationSnap.data() as Record<string, any> | undefined
-      const googleAds = (integrationData?.integrations?.googleAds ?? {}) as GoogleAdsIntegrationDoc
-      const refreshToken = typeof googleAds.refreshToken === 'string' ? googleAds.refreshToken : ''
+      const settingsRef = db().doc(`storeSettings/${storeId}`)
+      const settingsData = (docSnap.data() ?? {}) as Record<string, any>
+      const campaign = (settingsData.googleAdsAutomation?.campaign ?? {}) as Record<string, any>
 
-      if (!refreshToken) continue
+      try {
+        const auth = await getGoogleAdsAuthContext(storeId)
+        const metrics = await fetchGoogleAdsCampaignMetrics({
+          customerId: auth.customerId,
+          managerId: auth.managerId,
+          accessToken: auth.accessToken,
+          campaignId: typeof campaign.campaignId === 'string' ? campaign.campaignId : undefined,
+        })
 
-      let accessToken = typeof googleAds.accessToken === 'string' ? googleAds.accessToken : ''
-      let expiresAt = googleAds.expiresAt
-
-      if (!accessToken || isExpired(expiresAt)) {
-        const refreshed = await refreshGoogleAccessToken(refreshToken)
-        accessToken = typeof refreshed.access_token === 'string' ? refreshed.access_token : accessToken
-        const expiresIn =
-          typeof refreshed.expires_in === 'number' ? refreshed.expires_in : Number(refreshed.expires_in || 0)
-
-        await integrationRef.set(
+        await settingsRef.set(
           {
-            integrations: {
-              googleAds: {
-                accessToken,
-                tokenType: typeof refreshed.token_type === 'string' ? refreshed.token_type : 'Bearer',
-                expiresAt: expiresIn > 0 ? new Date(Date.now() + expiresIn * 1000) : null,
-                updatedAt: FieldValue.serverTimestamp(),
+            googleAdsAutomation: {
+              metrics: {
+                spend: metrics.spend,
+                leads: metrics.leads,
+                cpa: metrics.cpa,
+                syncedAt: FieldValue.serverTimestamp(),
+              },
+              jobs: {
+                metricsSync: {
+                  lastRunAt: FieldValue.serverTimestamp(),
+                  status: 'ok',
+                },
+              },
+            },
+          },
+          { merge: true },
+        )
+
+        updated += 1
+      } catch (storeError) {
+        await settingsRef.set(
+          {
+            googleAdsAutomation: {
+              jobs: {
+                metricsSync: {
+                  lastRunAt: FieldValue.serverTimestamp(),
+                  status: 'error',
+                  message: storeError instanceof Error ? storeError.message.slice(0, 300) : 'sync-failed',
+                },
               },
             },
           },
           { merge: true },
         )
       }
-
-      // Placeholder while Google Ads reporting pull is integrated.
-      // We still record job heartbeat and preserve existing metric values.
-      await integrationRef.set(
-        {
-          googleAdsAutomation: {
-            metrics: {
-              syncedAt: FieldValue.serverTimestamp(),
-            },
-            jobs: {
-              metricsSync: {
-                lastRunAt: FieldValue.serverTimestamp(),
-                status: 'ok',
-              },
-            },
-          },
-        },
-        { merge: true },
-      )
-
-      updated += 1
     }
 
     return res.status(200).json({ ok: true, scanned, updated })

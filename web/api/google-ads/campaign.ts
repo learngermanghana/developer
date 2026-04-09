@@ -1,8 +1,15 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node'
 import { FieldValue } from 'firebase-admin/firestore'
 import { db } from '../_firebase-admin.js'
-import { parseCampaignBrief, requireStoreId } from '../_google-ads.js'
-import { requireApiUser } from '../_api-auth.js'
+import {
+  createGoogleAdsCampaign,
+  fetchGoogleAdsCampaignMetrics,
+  getGoogleAdsAuthContext,
+  parseCampaignBrief,
+  requireStoreId,
+  updateGoogleAdsCampaignStatus,
+} from '../_google-ads.js'
+import { requireApiUser, requireStoreMembership } from '../_api-auth.js'
 
 type CampaignAction = 'create' | 'pause' | 'resume' | 'edit'
 
@@ -11,8 +18,8 @@ function parseAction(raw: unknown): CampaignAction {
   return 'create'
 }
 
-function makeCampaignId() {
-  return `SFX-${Date.now().toString().slice(-6)}`
+function makeCampaignName(storeId: string, goal: string): string {
+  return `SFX ${storeId.slice(0, 20)} ${goal.toUpperCase()} ${new Date().toISOString().slice(0, 10)}`
 }
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
@@ -21,9 +28,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   try {
-    await requireApiUser(req)
+    const user = await requireApiUser(req)
 
     const storeId = requireStoreId(req.body?.storeId)
+    await requireStoreMembership(user.uid, storeId)
     const action = parseAction(req.body?.action)
     const settingsRef = db().doc(`storeSettings/${storeId}`)
     const snapshot = await settingsRef.get()
@@ -34,10 +42,20 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const existingCampaign = (googleAdsAutomation.campaign ?? {}) as Record<string, any>
     const existingMetrics = (googleAdsAutomation.metrics ?? {}) as Record<string, any>
 
+    const auth = await getGoogleAdsAuthContext(storeId)
+
     if (action === 'pause' || action === 'resume') {
       if (!existingCampaign.campaignId) {
         return res.status(400).json({ error: 'No live campaign exists yet.' })
       }
+
+      await updateGoogleAdsCampaignStatus({
+        customerId: auth.customerId,
+        managerId: auth.managerId,
+        accessToken: auth.accessToken,
+        campaignId: String(existingCampaign.campaignId),
+        enabled: action === 'resume',
+      })
 
       await settingsRef.set(
         {
@@ -66,10 +84,37 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return res.status(400).json({ error: 'Confirm billing ownership first.' })
     }
 
-    const spend = typeof existingMetrics.spend === 'number' ? existingMetrics.spend : 0
-    const leads = typeof existingMetrics.leads === 'number' ? existingMetrics.leads : 0
+    let spend = typeof existingMetrics.spend === 'number' ? existingMetrics.spend : 0
+    let leads = typeof existingMetrics.leads === 'number' ? existingMetrics.leads : 0
+    let cpa = leads > 0 ? Number((spend / leads).toFixed(2)) : brief.dailyBudget
 
     const isCreate = action === 'create'
+    let campaignId = typeof existingCampaign.campaignId === 'string' ? existingCampaign.campaignId : ''
+    let adGroupName = typeof existingCampaign.adGroupName === 'string' ? existingCampaign.adGroupName : ''
+
+    if (isCreate) {
+      const created = await createGoogleAdsCampaign({
+        customerId: auth.customerId,
+        managerId: auth.managerId,
+        accessToken: auth.accessToken,
+        brief,
+        campaignName: makeCampaignName(storeId, brief.goal),
+      })
+      campaignId = created.campaignId
+      adGroupName = created.adGroupName
+    }
+
+    if (action === 'edit' && campaignId) {
+      const metrics = await fetchGoogleAdsCampaignMetrics({
+        customerId: auth.customerId,
+        managerId: auth.managerId,
+        accessToken: auth.accessToken,
+        campaignId,
+      })
+      spend = metrics.spend
+      leads = metrics.leads
+      cpa = metrics.cpa ?? brief.dailyBudget
+    }
 
     await settingsRef.set(
       {
@@ -77,26 +122,29 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           brief,
           campaign: {
             status: isCreate ? 'live' : existingCampaign.status || 'draft',
-            campaignId: existingCampaign.campaignId || (isCreate ? makeCampaignId() : ''),
-            adGroupName:
-              existingCampaign.adGroupName || (isCreate ? `${brief.goal.toUpperCase()}-Primary` : ''),
+            campaignId,
+            adGroupName,
             updatedAt: FieldValue.serverTimestamp(),
           },
           metrics: {
             spend,
             leads,
-            cpa: leads > 0 ? Number((spend / leads).toFixed(2)) : brief.dailyBudget,
+            cpa,
+            syncedAt: action === 'edit' ? FieldValue.serverTimestamp() : existingMetrics.syncedAt || null,
           },
         },
       },
       { merge: true },
     )
 
-    return res.status(200).json({ ok: true, status: isCreate ? 'live' : 'edited' })
+    return res.status(200).json({ ok: true, status: isCreate ? 'live' : 'edited', campaignId })
   } catch (error) {
     const message = error instanceof Error ? error.message : 'campaign-update-failed'
     if (message === 'missing-auth' || message === 'invalid-auth') {
       return res.status(401).json({ error: 'Unauthorized' })
+    }
+    if (message === 'store-access-denied') {
+      return res.status(403).json({ error: 'Forbidden' })
     }
 
     return res.status(400).json({ error: message })
