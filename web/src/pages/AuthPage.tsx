@@ -2,7 +2,9 @@ import React, { useEffect, useMemo, useState } from 'react'
 import type { User } from 'firebase/auth'
 import {
   createUserWithEmailAndPassword,
+  GoogleAuthProvider,
   signInWithEmailAndPassword,
+  signInWithPopup,
   sendEmailVerification,
 } from 'firebase/auth'
 import {
@@ -347,6 +349,27 @@ export default function AuthPage() {
   const isSubmitDisabled =
     isLoading || (mode === 'login' ? !isLoginFormValid : !isSignupFormValid)
 
+  const completeLogin = async (nextUser: User) => {
+    await persistSession(nextUser)
+    try {
+      const resolution = await resolveStoreAccess()
+      await persistSession(nextUser, {
+        storeId: resolution.storeId,
+        workspaceSlug: resolution.workspaceSlug,
+        role: resolution.role,
+      })
+      const reminder = formatTrialReminder(resolution.billing)
+      if (reminder) {
+        publish({ tone: 'info', message: reminder })
+      }
+    } catch (error) {
+      console.warn('[auth] Failed to resolve workspace access', error)
+      setStatus({ tone: 'error', message: getAuthErrorMessage(error, 'login') })
+      return false
+    }
+    return true
+  }
+
   useEffect(() => {
     document.title = mode === 'login' ? 'Sedifex — Log in' : 'Sedifex — Sign up'
   }, [mode])
@@ -560,21 +583,8 @@ export default function AuthPage() {
           sanitizedEmail,
           sanitizedPassword,
         )
-        await persistSession(nextUser)
-        try {
-          const resolution = await resolveStoreAccess()
-          await persistSession(nextUser, {
-            storeId: resolution.storeId,
-            workspaceSlug: resolution.workspaceSlug,
-            role: resolution.role,
-          })
-          const reminder = formatTrialReminder(resolution.billing)
-          if (reminder) {
-            publish({ tone: 'info', message: reminder })
-          }
-        } catch (error) {
-          console.warn('[auth] Failed to resolve workspace access', error)
-          setStatus({ tone: 'error', message: getAuthErrorMessage(error, 'login') })
+        const didCompleteLogin = await completeLogin(nextUser)
+        if (!didCompleteLogin) {
           return
         }
       } else {
@@ -705,6 +715,23 @@ export default function AuthPage() {
       setAddress('')
     } catch (err: unknown) {
       setStatus({ tone: 'error', message: getAuthErrorMessage(err, mode) })
+    }
+  }
+
+  async function handleGoogleSignIn() {
+    if (mode !== 'login' || isLoading) return
+
+    setStatus({ tone: 'loading', message: 'Connecting to Google…' })
+    try {
+      const provider = new GoogleAuthProvider()
+      provider.setCustomParameters({ prompt: 'select_account' })
+      const { user: nextUser } = await signInWithPopup(auth, provider)
+      const didCompleteLogin = await completeLogin(nextUser)
+      if (!didCompleteLogin) return
+
+      setStatus({ tone: 'success', message: 'Welcome back! Redirecting…' })
+    } catch (error) {
+      setStatus({ tone: 'error', message: getAuthErrorMessage(error, 'login') })
     }
   }
 
@@ -1010,6 +1037,17 @@ export default function AuthPage() {
                   ? 'Log in'
                   : 'Start free trial'}
             </button>
+
+            {mode === 'login' && (
+              <button
+                className="secondary-button"
+                type="button"
+                onClick={handleGoogleSignIn}
+                disabled={isLoading}
+              >
+                Continue with Google
+              </button>
+            )}
           </form>
 
           {status.tone !== 'idle' && status.message && (
