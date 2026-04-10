@@ -111,6 +111,55 @@ function hashValue(value: string): string {
   return createHash('sha256').update(value).digest('hex')
 }
 
+function generateIntegrationSecret(): string {
+  return randomBytes(24).toString('base64url')
+}
+
+function shortMask(value: string): string {
+  if (value.length <= 8) return '••••••••'
+  return `${value.slice(0, 4)}••••${value.slice(-4)}`
+}
+
+async function ensureIntegrationApiKey(params: {
+  storeId: string
+  uid: string
+  existingIntegrationApiKey: string
+}): Promise<string> {
+  if (params.existingIntegrationApiKey) return params.existingIntegrationApiKey
+
+  const token = `sedx_${generateIntegrationSecret()}`
+  const keyHash = hashValue(token)
+  const keyPreview = shortMask(token)
+  const timestamp = FieldValue.serverTimestamp()
+
+  await db.collection('integrationApiKeys').doc().set({
+    storeId: params.storeId,
+    name: 'Google Shopping auto-generated key',
+    status: 'active',
+    keyHash,
+    keyPreview,
+    createdBy: params.uid,
+    createdAt: timestamp,
+    updatedAt: timestamp,
+    revokedAt: null,
+    lastUsedAt: null,
+    source: 'google-shopping-connect',
+  })
+
+  await db.collection('integrationAuditLogs').add({
+    storeId: params.storeId,
+    action: 'api_key.created',
+    actorUid: params.uid,
+    metadata: {
+      name: 'Google Shopping auto-generated key',
+      source: 'google-shopping-connect',
+    },
+    createdAt: timestamp,
+  })
+
+  return token
+}
+
 function parseTokenExpiry(tokenPayload: Record<string, unknown>): Timestamp | null {
   const expiresInRaw = tokenPayload.expires_in
   const expiresIn = typeof expiresInRaw === 'number' ? expiresInRaw : Number(expiresInRaw || 0)
@@ -382,6 +431,11 @@ async function saveGoogleMerchantConnection(params: {
   const tokenExpiry = parseTokenExpiry(params.tokenPayload)
 
   const existingIntegrationApiKey = normalizeString(catalogSync.integrationApiKey)
+  const ensuredIntegrationApiKey = await ensureIntegrationApiKey({
+    storeId: params.storeId,
+    uid: params.uid,
+    existingIntegrationApiKey,
+  })
   const existingIntegrationBaseUrl = normalizeString(catalogSync.integrationBaseUrl)
   const existingAutoSyncEnabled = catalogSync.autoSyncEnabled === false ? false : true
 
@@ -392,7 +446,7 @@ async function saveGoogleMerchantConnection(params: {
     tokenUpdatedAt: FieldValue.serverTimestamp(),
     autoSyncEnabled: existingAutoSyncEnabled,
     integrationBaseUrl: existingIntegrationBaseUrl || DEFAULT_INTEGRATION_BASE_URL,
-    integrationApiKey: existingIntegrationApiKey,
+    integrationApiKey: ensuredIntegrationApiKey,
     ...(tokenExpiry ? { tokenExpiry } : {}),
   }
 
