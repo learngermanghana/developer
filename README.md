@@ -154,7 +154,8 @@ Minimum backend vars:
 
 - `GOOGLE_ADS_CLIENT_ID`
 - `GOOGLE_ADS_CLIENT_SECRET`
-- `GOOGLE_ADS_REDIRECT_URI` (set to `https://www.sedifex.com/api/google-ads/oauth-callback`)
+- `GOOGLE_REDIRECT_URI` (recommended: `https://www.sedifex.com/api/google/oauth-callback`)
+- `GOOGLE_ADS_REDIRECT_URI` (optional backward-compatible fallback)
 - `APP_BASE_URL` (set to `https://www.sedifex.com`)
 - `GOOGLE_ADS_SYNC_SECRET` (used by the optional manual sync endpoint)
 
@@ -167,18 +168,18 @@ Firebase Functions uses its runtime service account by default, so no extra Admi
 In your OAuth client:
 
 - Add authorized redirect URI exactly matching:
-  - `https://www.sedifex.com/api/google-ads/oauth-callback`
+  - `https://www.sedifex.com/api/google/oauth-callback`
 - Ensure Google Ads scope is allowed:
   - `https://www.googleapis.com/auth/adwords`
 
-The backend builds the OAuth URL with that redirect URI and exchanges auth code for tokens. The URI in Google Cloud Console must be an exact string match with `GOOGLE_ADS_REDIRECT_URI`.
+The backend builds the OAuth URL with that redirect URI and exchanges auth code for tokens. The URI in Google Cloud Console must be an exact string match with `GOOGLE_REDIRECT_URI` (or `GOOGLE_ADS_REDIRECT_URI` when using fallback mode).
 
 ### 3) Deploy Firebase Hosting + Cloud Functions
 
-This implementation depends on Firebase Hosting rewrites that forward these paths to Cloud Functions:
+This implementation depends on Hosting/server rewrites that forward these paths:
 
-- `/api/google-ads/oauth-start` → `googleAdsOAuthStart`
-- `/api/google-ads/oauth-callback` → `googleAdsOAuthCallback`
+- `/api/google/oauth-start` → shared OAuth start handler
+- `/api/google/oauth-callback` → shared OAuth callback handler
 - `/api/google-ads/campaign` → `googleAdsCampaign`
 - `/api/google-ads/metrics-sync` → `googleAdsMetricsSync`
 

@@ -57,6 +57,10 @@ export function isReconnectRequiredError(message: string) {
   const normalized = message.toLowerCase()
   return (
     normalized.includes('refresh token') ||
+    normalized.includes('refresh-token') ||
+    normalized.includes('missing token') ||
+    normalized.includes('missing-token') ||
+    normalized.includes('missing-access-token') ||
     normalized.includes('invalid_grant') ||
     normalized.includes('revoked') ||
     normalized.includes('reauth') ||
