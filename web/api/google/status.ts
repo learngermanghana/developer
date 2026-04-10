@@ -1,11 +1,26 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node'
-import { db } from '../_firebase-admin.js'
 import { requireApiUser, requireStoreMembership } from '../_api-auth.js'
-import { GOOGLE_REQUIRED_SCOPE, hasScope, parseGrantedScopes } from '../_google-oauth.js'
+import {
+  GOOGLE_REQUIRED_SCOPE,
+  getGoogleOAuthStateForStore,
+  hasScope,
+  type GoogleIntegration,
+} from '../_google-oauth.js'
 
 function requireStoreId(raw: unknown): string {
   if (typeof raw !== 'string' || !raw.trim()) throw new Error('invalid-store-id')
   return raw.trim()
+}
+
+const ALL_INTEGRATIONS: GoogleIntegration[] = ['ads', 'business', 'merchant']
+
+function parseRequestedIntegrations(rawIntegration: unknown, rawIntegrations: unknown): GoogleIntegration[] {
+  const requested = Array.isArray(rawIntegrations) ? rawIntegrations : [rawIntegration]
+  const unique = new Set<GoogleIntegration>()
+  for (const entry of requested) {
+    if (entry === 'ads' || entry === 'business' || entry === 'merchant') unique.add(entry)
+  }
+  return unique.size ? Array.from(unique) : ALL_INTEGRATIONS
 }
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
@@ -14,24 +29,29 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   try {
     const user = await requireApiUser(req)
     const storeId = requireStoreId(req.body?.storeId)
+    const requestedIntegrations = parseRequestedIntegrations(req.body?.integration, req.body?.integrations)
     await requireStoreMembership(user.uid, storeId)
 
-    const snap = await db().doc(`storeSettings/${storeId}`).get()
-    const data = (snap.data() ?? {}) as Record<string, any>
-    const oauth = (data.integrations?.googleOAuth ?? {}) as Record<string, unknown>
-    const granted = parseGrantedScopes(oauth.scope)
-
-    const adsTokenConfigured = Boolean(process.env.GOOGLE_ADS_DEVELOPER_TOKEN?.trim())
+    const oauthState = await getGoogleOAuthStateForStore(storeId)
+    const granted = oauthState.grantedScopes
+    const grantedScopes = Array.from(granted)
+    const connected = oauthState.connected
+    const integrations = requestedIntegrations.reduce(
+      (acc, integration) => {
+        const hasRequiredScope = hasScope(granted, GOOGLE_REQUIRED_SCOPE[integration])
+        acc[integration] = {
+          connected: connected && hasRequiredScope,
+          hasRequiredScope,
+        }
+        return acc
+      },
+      {} as Partial<Record<GoogleIntegration, { connected: boolean; hasRequiredScope: boolean }>>,
+    )
 
     return res.status(200).json({
-      business: hasScope(granted, GOOGLE_REQUIRED_SCOPE.business) ? 'Connected' : 'Needs permission',
-      ads: hasScope(granted, GOOGLE_REQUIRED_SCOPE.ads)
-        ? adsTokenConfigured
-          ? 'Connected'
-          : 'Developer token required'
-        : 'Needs permission',
-      merchant: hasScope(granted, GOOGLE_REQUIRED_SCOPE.merchant) ? 'Connected' : 'Needs permission',
-      grantedScopes: Array.from(granted),
+      connected,
+      grantedScopes,
+      integrations,
     })
   } catch (error) {
     const message = error instanceof Error ? error.message : 'status-failed'

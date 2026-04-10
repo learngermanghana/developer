@@ -3,9 +3,9 @@ import { auth } from '../firebase'
 export type GoogleIntegrationKey = 'business' | 'ads' | 'merchant'
 export type GoogleIntegrationStatus = 'Connected' | 'Needs permission' | 'Developer token required'
 export type GoogleIntegrationOverview = {
-  statuses: Record<GoogleIntegrationKey, GoogleIntegrationStatus>
+  connected: boolean
+  integrations: Record<GoogleIntegrationKey, { connected: boolean; hasRequiredScope: boolean }>
   grantedScopes: string[]
-  hasGoogleConnection: boolean
 }
 
 async function authHeaders() {
@@ -36,60 +36,56 @@ export async function startGoogleOAuth(params: {
 }
 
 export async function fetchGoogleIntegrationStatus(storeId: string): Promise<Record<GoogleIntegrationKey, GoogleIntegrationStatus>> {
-  const headers = await authHeaders()
-  const response = await fetch('/api/google/status', {
-    method: 'POST',
-    headers,
-    body: JSON.stringify({ storeId }),
-  })
-  const payload = (await response.json().catch(() => ({}))) as Record<string, unknown>
-  if (!response.ok) {
-    throw new Error(typeof payload.error === 'string' ? payload.error : 'Unable to load Google integration status.')
-  }
-
+  const overview = await fetchGoogleIntegrationOverview(storeId)
   return {
-    business: payload.business === 'Connected' ? 'Connected' : 'Needs permission',
-    ads:
-      payload.ads === 'Connected'
-        ? 'Connected'
-        : payload.ads === 'Developer token required'
-          ? 'Developer token required'
-          : 'Needs permission',
-    merchant: payload.merchant === 'Connected' ? 'Connected' : 'Needs permission',
+    business: overview.integrations.business.hasRequiredScope ? 'Connected' : 'Needs permission',
+    ads: overview.integrations.ads.hasRequiredScope ? 'Connected' : 'Needs permission',
+    merchant: overview.integrations.merchant.hasRequiredScope ? 'Connected' : 'Needs permission',
   }
 }
 
-export async function fetchGoogleIntegrationOverview(storeId: string): Promise<GoogleIntegrationOverview> {
+export async function fetchGoogleIntegrationOverview(
+  storeId: string,
+  integrations?: GoogleIntegrationKey[],
+): Promise<GoogleIntegrationOverview> {
   const headers = await authHeaders()
   const response = await fetch('/api/google/status', {
     method: 'POST',
     headers,
-    body: JSON.stringify({ storeId }),
+    body: JSON.stringify({ storeId, integrations }),
   })
   const payload = (await response.json().catch(() => ({}))) as Record<string, unknown>
   if (!response.ok) {
     throw new Error(typeof payload.error === 'string' ? payload.error : 'Unable to load Google integration status.')
   }
 
-  const statuses: Record<GoogleIntegrationKey, GoogleIntegrationStatus> = {
-    business: payload.business === 'Connected' ? 'Connected' : 'Needs permission',
-    ads:
-      payload.ads === 'Connected'
-        ? 'Connected'
-        : payload.ads === 'Developer token required'
-          ? 'Developer token required'
-          : 'Needs permission',
-    merchant: payload.merchant === 'Connected' ? 'Connected' : 'Needs permission',
+  const rawIntegrations = (payload.integrations ?? {}) as Record<string, unknown>
+  const integrations: Record<GoogleIntegrationKey, { connected: boolean; hasRequiredScope: boolean }> = {
+    business: {
+      connected: Boolean((rawIntegrations.business as Record<string, unknown> | undefined)?.connected),
+      hasRequiredScope: Boolean(
+        (rawIntegrations.business as Record<string, unknown> | undefined)?.hasRequiredScope,
+      ),
+    },
+    ads: {
+      connected: Boolean((rawIntegrations.ads as Record<string, unknown> | undefined)?.connected),
+      hasRequiredScope: Boolean((rawIntegrations.ads as Record<string, unknown> | undefined)?.hasRequiredScope),
+    },
+    merchant: {
+      connected: Boolean((rawIntegrations.merchant as Record<string, unknown> | undefined)?.connected),
+      hasRequiredScope: Boolean(
+        (rawIntegrations.merchant as Record<string, unknown> | undefined)?.hasRequiredScope,
+      ),
+    },
   }
   const grantedScopes = Array.isArray(payload.grantedScopes)
     ? payload.grantedScopes.filter((scope): scope is string => typeof scope === 'string')
     : []
-  const hasGoogleConnection =
-    grantedScopes.length > 0 || statuses.ads === 'Developer token required' || statuses.business === 'Connected' || statuses.merchant === 'Connected'
+  const connected = payload.connected === true || grantedScopes.length > 0
 
   return {
-    statuses,
+    connected,
+    integrations,
     grantedScopes,
-    hasGoogleConnection,
   }
 }

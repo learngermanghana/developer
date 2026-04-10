@@ -81,6 +81,23 @@ export async function getGrantedScopesForStore(storeId: string): Promise<Set<str
   return parseGrantedScopes(oauth.scope)
 }
 
+export async function getGoogleOAuthStateForStore(storeId: string): Promise<{
+  connected: boolean
+  grantedScopes: Set<string>
+}> {
+  const snap = await db().doc(`storeSettings/${storeId}`).get()
+  const data = (snap.data() ?? {}) as Record<string, any>
+  const oauth = (data.integrations?.googleOAuth ?? {}) as Record<string, unknown>
+  const grantedScopes = parseGrantedScopes(oauth.scope)
+  const hasToken =
+    (typeof oauth.accessToken === 'string' && oauth.accessToken.trim().length > 0) ||
+    (typeof oauth.refreshToken === 'string' && oauth.refreshToken.trim().length > 0)
+  return {
+    connected: hasToken || grantedScopes.size > 0,
+    grantedScopes,
+  }
+}
+
 export async function buildGoogleOAuthStartUrl(params: {
   uid: string
   storeId: string
