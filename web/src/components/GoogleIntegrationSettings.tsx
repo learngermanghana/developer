@@ -5,6 +5,7 @@ import {
   type GoogleIntegrationKey,
   type GoogleIntegrationStatus,
 } from '../api/googleIntegrations'
+import { clearGoogleOAuthQueryState, parseGoogleOAuthQueryState } from '../utils/googleOAuthCallback'
 
 type Props = { storeId: string }
 
@@ -25,13 +26,18 @@ export default function GoogleIntegrationSettings({ storeId }: Props) {
   const [message, setMessage] = useState('')
 
   useEffect(() => {
-    const params = new URLSearchParams(window.location.search)
-    const oauthState = params.get('googleOAuth')
-    if (oauthState === 'success') {
-      setMessage(params.get('message') || 'Google OAuth connected.')
-    } else if (oauthState === 'failed') {
-      setMessage(params.get('message') || 'Google OAuth failed.')
+    if (typeof window === 'undefined') return
+    const queryState = parseGoogleOAuthQueryState(window.location.search)
+    if (!queryState.status) return
+
+    if (queryState.status === 'success') {
+      setMessage(queryState.message || 'Google OAuth connected.')
+    } else {
+      setMessage(queryState.message || 'Google OAuth failed.')
     }
+
+    const nextUrl = clearGoogleOAuthQueryState(window.location.href)
+    window.history.replaceState({}, '', nextUrl)
   }, [])
 
   useEffect(() => {
