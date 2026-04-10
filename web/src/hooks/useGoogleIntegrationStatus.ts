@@ -4,7 +4,6 @@ import {
   fetchGoogleIntegrationOverview,
   startGoogleOAuth,
   type GoogleIntegrationKey,
-  type GoogleIntegrationStatus,
 } from '../api/googleIntegrations'
 
 const REQUIRED_SCOPE_BY_INTEGRATION: Record<GoogleIntegrationKey, string> = {
@@ -23,9 +22,8 @@ function getButtonLabel(params: {
   integration: GoogleIntegrationKey
   hasGoogleConnection: boolean
   hasRequiredScope: boolean
-  status: GoogleIntegrationStatus
 }) {
-  if (params.hasRequiredScope && params.status === 'Connected') return 'Connected'
+  if (params.hasRequiredScope) return 'Connected'
   if (!params.hasGoogleConnection) return 'Connect Google'
 
   if (params.integration === 'ads') return 'Grant Google Ads access'
@@ -50,15 +48,15 @@ export function useGoogleIntegrationStatus(input: UseGoogleIntegrationStatusInpu
 
   const [isLoading, setIsLoading] = useState(false)
   const [isStartingOAuth, setIsStartingOAuth] = useState(false)
-  const [status, setStatus] = useState<GoogleIntegrationStatus>('Needs permission')
   const [hasGoogleConnection, setHasGoogleConnection] = useState(false)
+  const [isConnected, setIsConnected] = useState(false)
   const [grantedScopes, setGrantedScopes] = useState<string[]>([])
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
     if (!storeId) {
-      setStatus('Needs permission')
       setHasGoogleConnection(false)
+      setIsConnected(false)
       setGrantedScopes([])
       return
     }
@@ -70,8 +68,8 @@ export function useGoogleIntegrationStatus(input: UseGoogleIntegrationStatusInpu
     fetchGoogleIntegrationOverview(storeId)
       .then((overview) => {
         if (!mounted) return
-        setStatus(overview.statuses[integration])
-        setHasGoogleConnection(overview.hasGoogleConnection)
+        setHasGoogleConnection(overview.connected)
+        setIsConnected(overview.integrations[integration].connected)
         setGrantedScopes(overview.grantedScopes)
       })
       .catch((nextError) => {
@@ -88,15 +86,13 @@ export function useGoogleIntegrationStatus(input: UseGoogleIntegrationStatusInpu
   }, [integration, storeId])
 
   const hasRequiredScope = useMemo(
-    () => grantedScopes.includes(requiredScope) || status === 'Connected',
-    [grantedScopes, requiredScope, status],
+    () => grantedScopes.includes(requiredScope),
+    [grantedScopes, requiredScope],
   )
 
-  const isConnected = status === 'Connected'
-
   const buttonLabel = useMemo(
-    () => getButtonLabel({ integration, hasGoogleConnection, hasRequiredScope, status }),
-    [hasGoogleConnection, hasRequiredScope, integration, status],
+    () => getButtonLabel({ integration, hasGoogleConnection, hasRequiredScope }),
+    [hasGoogleConnection, hasRequiredScope, integration],
   )
 
   const stateTitle = useMemo(
@@ -132,7 +128,6 @@ export function useGoogleIntegrationStatus(input: UseGoogleIntegrationStatusInpu
     isConnected,
     hasRequiredScope,
     hasGoogleConnection,
-    status,
     stateTitle,
     buttonLabel,
     requiredScope,
