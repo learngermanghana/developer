@@ -4,13 +4,13 @@ import { doc, onSnapshot } from 'firebase/firestore'
 import {
   getGoogleMerchantPendingAccounts,
   selectGoogleMerchantAccount,
-  startGoogleMerchantOAuth,
   triggerGoogleShoppingSync,
   type GoogleMerchantAccount,
   type GoogleShoppingSyncSummary,
 } from '../api/googleShopping'
 import { db } from '../firebase'
 import { useActiveStore } from '../hooks/useActiveStore'
+import { useGoogleIntegrationStatus } from '../hooks/useGoogleIntegrationStatus'
 import './GoogleShopping.css'
 
 type WizardStep = 'connect' | 'map' | 'fix' | 'status'
@@ -18,6 +18,7 @@ type WizardStep = 'connect' | 'map' | 'fix' | 'status'
 type OAuthQueryState = {
   oauthStatus: 'success' | 'failed' | ''
   oauthMessage: string
+  integrations: string[]
   oauthMerchantId: string
   pendingSelectionId: string
   refreshTokenMissing: boolean
@@ -37,14 +38,22 @@ const STEP_LABELS: Record<WizardStep, string> = {
 
 function parseOAuthQueryState(): OAuthQueryState {
   const params = new URLSearchParams(window.location.search)
+  const sharedOAuth = params.get('googleOAuth')
+  const legacyMerchantOAuth = params.get('googleMerchantOAuth')
+  const integrations = (params.get('integrations') || '')
+    .split(',')
+    .map((entry) => entry.trim())
+    .filter(Boolean)
+
   return {
     oauthStatus:
-      params.get('googleMerchantOAuth') === 'success'
+      sharedOAuth === 'success' || legacyMerchantOAuth === 'success'
         ? 'success'
-        : params.get('googleMerchantOAuth') === 'failed'
+        : sharedOAuth === 'failed' || legacyMerchantOAuth === 'failed'
           ? 'failed'
           : '',
     oauthMessage: params.get('message') || '',
+    integrations,
     oauthMerchantId: params.get('merchantId') || '',
     pendingSelectionId: params.get('pendingSelectionId') || '',
     refreshTokenMissing: params.get('refreshTokenMissing') === '1',
@@ -53,6 +62,8 @@ function parseOAuthQueryState(): OAuthQueryState {
 
 function clearOAuthQueryState() {
   const url = new URL(window.location.href)
+  url.searchParams.delete('googleOAuth')
+  url.searchParams.delete('integrations')
   url.searchParams.delete('googleMerchantOAuth')
   url.searchParams.delete('message')
   url.searchParams.delete('merchantId')
@@ -73,11 +84,21 @@ export default function GoogleShopping() {
   const [status, setStatus] = useState<string | null>(null)
   const [summary, setSummary] = useState<GoogleShoppingSyncSummary | null>(null)
   const [saving, setSaving] = useState(false)
-  const [oauthConnecting, setOauthConnecting] = useState(false)
   const [pendingSelectionId, setPendingSelectionId] = useState('')
   const [pendingAccounts, setPendingAccounts] = useState<GoogleMerchantAccount[]>([])
   const [selectedMerchantId, setSelectedMerchantId] = useState('')
   const [connection, setConnection] = useState<GoogleShoppingConnection>({ connected: false, merchantId: '' })
+  const {
+    isLoading: oauthStatusLoading,
+    isStartingOAuth,
+    hasGoogleConnection,
+    hasRequiredScope,
+    isConnected,
+    buttonLabel,
+    stateTitle,
+    error: oauthError,
+    startOAuth,
+  } = useGoogleIntegrationStatus({ integration: 'merchant', storeId })
 
   const checklist = useMemo(
     () => [
@@ -92,11 +113,13 @@ export default function GoogleShopping() {
 
   useEffect(() => {
     const queryState = parseOAuthQueryState()
-    if (queryState.oauthStatus === 'failed') {
+    const includesMerchant = queryState.integrations.length === 0 || queryState.integrations.includes('merchant')
+
+    if (queryState.oauthStatus === 'failed' && includesMerchant) {
       setStatus(queryState.oauthMessage || 'We could not connect your Google Merchant account. Please try again.')
     }
 
-    if (queryState.oauthStatus === 'success') {
+    if (queryState.oauthStatus === 'success' && includesMerchant) {
       if (queryState.pendingSelectionId) {
         setPendingSelectionId(queryState.pendingSelectionId)
         setStatus('We found multiple Merchant accounts. Please choose the one you want to connect.')
@@ -172,23 +195,19 @@ export default function GoogleShopping() {
     }
   }, [pendingSelectionId])
 
+  useEffect(() => {
+    if (!oauthError) return
+    setStatus(oauthError)
+  }, [oauthError])
+
   async function connectGoogleMerchant() {
     if (!storeId) {
       setStatus('Please select a store before connecting Google Merchant.')
       return
     }
 
-    setOauthConnecting(true)
     setStatus(null)
-
-    try {
-      const url = await startGoogleMerchantOAuth({ storeId })
-      window.location.assign(url)
-    } catch (error) {
-      const message = error instanceof Error ? error.message : 'Unable to start Google Merchant connection.'
-      setStatus(message)
-      setOauthConnecting(false)
-    }
+    await startOAuth()
   }
 
   async function confirmMerchantSelection() {
@@ -267,15 +286,24 @@ export default function GoogleShopping() {
 
       {step === 'connect' && (
         <section className="google-shopping-panel">
-          <h2>Connect account</h2>
+          <h2>{stateTitle}</h2>
           <p>
-            Click below to sign in with Google. Sedifex will discover your Merchant accounts and
-            connect automatically when possible.
+            {!hasGoogleConnection
+              ? 'Connect your Google account to continue.'
+              : !hasRequiredScope
+                ? 'Your Google account is connected. Grant Google Merchant access to continue.'
+                : connection.connected
+                  ? 'Google Merchant is connected for this store.'
+                  : 'Google Merchant access is ready. Connect and choose your Merchant account.'}
           </p>
 
-          <button type="button" disabled={oauthConnecting || saving} onClick={connectGoogleMerchant}>
-            {oauthConnecting ? 'Connecting…' : connection.connected ? 'Reconnect Google Merchant' : 'Connect Google Merchant'}
-          </button>
+          {oauthStatusLoading ? <p className="google-shopping-panel__hint">Checking Google connection…</p> : null}
+
+          {!isConnected || !connection.connected ? (
+            <button type="button" disabled={isStartingOAuth || saving} onClick={connectGoogleMerchant}>
+              {isStartingOAuth ? 'Connecting…' : buttonLabel}
+            </button>
+          ) : null}
 
           {connection.connected && (
             <p className="google-shopping-panel__connected">Connected Merchant ID: <strong>{connection.merchantId}</strong></p>
