@@ -112,11 +112,9 @@ function parseSettings(raw: Record<string, unknown> | undefined): AdsAutomationS
     typeof connectionRaw.accountEmail === 'string' ? connectionRaw.accountEmail : ''
   const customerId = typeof connectionRaw.customerId === 'string' ? connectionRaw.customerId : ''
   const managerId = typeof connectionRaw.managerId === 'string' ? connectionRaw.managerId : ''
-  const hasConnectionDetails = accountEmail.trim().length > 0 && customerId.trim().length > 0
-
   return {
     connection: {
-      connected: connectionRaw.connected === true && hasConnectionDetails,
+      connected: connectionRaw.connected === true,
       accountEmail,
       customerId,
       managerId,
@@ -252,11 +250,6 @@ export default function AdsCampaigns() {
   }
 
   async function handleConnectClick() {
-    if (!settings.connection.accountEmail.trim()) {
-      setNotice('Add the Google account email first.')
-      return
-    }
-
     if (!storeId) return
 
     setSaving(true)
