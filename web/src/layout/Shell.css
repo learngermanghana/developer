@@ -29,7 +29,10 @@ body.shell--menu-open {
   display: flex;
   align-items: center;
   gap: 16px;
-  flex-wrap: wrap;
+}
+
+.shell__header-controls {
+  margin-left: auto;
 }
 
 .shell__toolbar {
@@ -39,6 +42,7 @@ body.shell--menu-open {
   gap: 14px;
   width: 100%;
   z-index: 40;
+  display: none;
 }
 
 .shell__backdrop {
@@ -143,18 +147,17 @@ body.shell--menu-open {
 
 .shell__nav {
   display: flex;
-  gap: 8px;
-  flex-wrap: wrap;
-  justify-content: center;
-  align-items: center;
-  flex-grow: 1;
+  gap: 10px;
+  flex-direction: column;
+  align-items: stretch;
+  width: 100%;
 }
 
 .shell__nav-search {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  margin-right: 4px;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 6px;
 }
 
 .shell__nav-search-label {
@@ -164,8 +167,8 @@ body.shell--menu-open {
 }
 
 .shell__nav-search-input {
-  width: min(220px, 40vw);
-  min-width: 160px;
+  width: 100%;
+  min-width: 0;
   border-radius: 999px;
   padding: 8px 12px;
   font-size: 13px;
@@ -195,10 +198,20 @@ body.shell--menu-open {
 
 .shell__nav-group {
   display: flex;
-  align-items: center;
+  align-items: stretch;
+  flex-direction: column;
   gap: 12px;
-  flex-wrap: wrap;
-  justify-content: space-between;
+}
+
+.shell__sidebar {
+  position: sticky;
+  top: 92px;
+  align-self: start;
+  padding: 14px;
+  border-radius: 16px;
+  border: 1px solid #e2e8f0;
+  background: #ffffff;
+  box-shadow: 0 12px 28px -24px rgba(15, 23, 42, 0.45);
 }
 
 .shell__workspace-pill {
@@ -226,12 +239,12 @@ body.shell--menu-open {
 }
 
 .shell__nav-link {
-  display: inline-flex;
+  display: flex;
   align-items: center;
-  justify-content: center;
+  justify-content: flex-start;
   gap: 6px;
   padding: 8px 14px;
-  border-radius: 999px;
+  border-radius: 12px;
   text-decoration: none;
   font-size: 14px;
   font-weight: 500;
@@ -270,7 +283,6 @@ body.shell--menu-open {
 }
 
 .shell__controls {
-  margin-left: auto;
   display: flex;
   align-items: center;
   gap: 12px;
@@ -315,6 +327,21 @@ body.shell--menu-open {
 .shell__main {
   width: 100%;
   padding: 32px 0 48px;
+}
+
+.shell__layout {
+  display: grid;
+  grid-template-columns: minmax(220px, 270px) minmax(0, 1fr);
+  gap: 20px;
+  align-items: start;
+}
+
+.shell__content {
+  min-width: 0;
+}
+
+.shell__content-inner {
+  min-width: 0;
 }
 
 .shell :where(a:not([class])) {
@@ -477,6 +504,11 @@ body.shell--menu-open {
 
   .shell__header-inner {
     align-items: flex-start;
+    flex-wrap: wrap;
+  }
+
+  .shell__header-controls {
+    display: none;
   }
 
   .shell__brand {
@@ -523,17 +555,11 @@ body.shell--menu-open {
   }
 
   .shell__nav {
-    flex-direction: column;
-    align-items: stretch;
-    width: 100%;
     gap: 12px;
   }
 
   .shell__nav-search {
     width: 100%;
-    flex-direction: column;
-    align-items: stretch;
-    margin-right: 0;
   }
 
   .shell__nav-search-input {
@@ -558,6 +584,10 @@ body.shell--menu-open {
   .shell__nav-group {
     flex-direction: column;
     align-items: stretch;
+  }
+
+  .shell__sidebar {
+    display: none;
   }
 
   .shell__workspace-pill {
@@ -609,6 +639,10 @@ body.shell--menu-open {
   }
 
   .shell__main {
-    padding: 24px 16px 36px;
+    padding: 24px 0 36px;
+  }
+
+  .shell__layout {
+    display: block;
   }
 }
