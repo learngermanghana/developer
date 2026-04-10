@@ -344,6 +344,113 @@ export default function Shell({ children }: { children: React.ReactNode }) {
   const workspaceStatus = billing?.planKey ?? 'Workspace ready'
   const workspaceLabel = workspaceName || workspaceStatus
 
+  const navSection = (
+    <div className="shell__nav-group">
+      <div
+        className="shell__workspace-pill"
+        role="status"
+        aria-live="polite"
+      >
+        <span className="shell__workspace-label">Workspace</span>
+        <span className="shell__workspace-name">
+          {workspaceLoading && !workspaceLabel
+            ? 'Loading…'
+            : workspaceLabel}
+        </span>
+      </div>
+
+      <nav
+        className="shell__nav"
+        aria-label="Primary"
+        id="primary-nav"
+      >
+        <label className="shell__nav-search">
+          <span className="shell__nav-search-label">Search pages</span>
+          <input
+            type="search"
+            placeholder="Find a page…"
+            value={navSearchQuery}
+            onChange={event => setNavSearchQuery(event.target.value)}
+            className="shell__nav-search-input"
+          />
+        </label>
+
+        {filteredNavItems.map(item => (
+          <NavLink
+            key={item.to}
+            to={item.to}
+            end={item.end}
+            className={({ isActive }) => navLinkClass(isActive, Boolean(item.parentTo))}
+          >
+            {item.label}
+          </NavLink>
+        ))}
+
+        {filteredNavItems.length === 0 && (
+          <p className="shell__nav-empty" role="status">
+            No pages match “{navSearchQuery.trim()}”.
+          </p>
+        )}
+      </nav>
+    </div>
+  )
+
+  const controlsSection = (
+    <div className="shell__controls">
+      <div
+        className="shell__store-switcher"
+        role="status"
+        aria-live="polite"
+      >
+        <span className="shell__store-label">Workspace</span>
+        <span
+          className="shell__store-select"
+          data-readonly
+        >
+          {workspaceStatus}
+        </span>
+      </div>
+
+      {banner && (
+        <div
+          className="shell__status-badge"
+          data-variant={banner.variant}
+          role="status"
+          aria-live="polite"
+          title={banner.message}
+        >
+          <span
+            className={`shell__status-dot${
+              banner.pulse ? ' is-pulsing' : ''
+            }`}
+            aria-hidden="true"
+          />
+          <span className="shell__status-label">
+            {BADGE_LABELS[banner.variant]}
+          </span>
+          <span className="shell__sr-only">
+            {banner.message}
+          </span>
+        </div>
+      )}
+
+      <SupportTicketLauncher />
+
+      <div className="shell__account">
+        <span className="shell__account-email">
+          {userEmail}
+        </span>
+        <button
+          type="button"
+          className="button button--primary button--small"
+          onClick={() => signOut(auth)}
+        >
+          Sign out
+        </button>
+      </div>
+    </div>
+  )
+
   return (
     <div className="shell">
       {isMenuOpen && (
@@ -360,6 +467,10 @@ export default function Shell({ children }: { children: React.ReactNode }) {
             <div className="shell__brand">
               <div className="shell__logo">Sedifex</div>
               <span className="shell__tagline">Sell faster. Count smarter.</span>
+            </div>
+
+            <div className="shell__header-controls">
+              {controlsSection}
             </div>
 
             <button
@@ -386,138 +497,8 @@ export default function Shell({ children }: { children: React.ReactNode }) {
               isMenuOpen ? ' is-open' : ''
             }`}
           >
-            <div className="shell__nav-group">
-              <div
-                className="shell__workspace-pill"
-                role="status"
-                aria-live="polite"
-              >
-                <span className="shell__workspace-label">Workspace</span>
-                <span className="shell__workspace-name">
-                  {workspaceLoading && !workspaceLabel
-                    ? 'Loading…'
-                    : workspaceLabel}
-                </span>
-              </div>
-
-              <nav
-                className="shell__nav"
-                aria-label="Primary"
-                id="primary-nav"
-              >
-                <label className="shell__nav-search">
-                  <span className="shell__nav-search-label">Search pages</span>
-                  <input
-                    type="search"
-                    placeholder="Find a page…"
-                    value={navSearchQuery}
-                    onChange={event => setNavSearchQuery(event.target.value)}
-                    className="shell__nav-search-input"
-                  />
-                </label>
-
-                {filteredNavItems.map(item => (
-                  <NavLink
-                    key={item.to}
-                    to={item.to}
-                    end={item.end}
-                    className={({ isActive }) => navLinkClass(isActive, Boolean(item.parentTo))}
-                  >
-                    {item.label}
-                  </NavLink>
-                ))}
-
-                {filteredNavItems.length === 0 && (
-                  <p className="shell__nav-empty" role="status">
-                    No pages match “{navSearchQuery.trim()}”.
-                  </p>
-                )}
-              </nav>
-            </div>
-
-            <div className="shell__controls">
-              {resumePath && (
-                <div className="shell__resume-banner" role="status" aria-live="polite">
-                  <span>Return to where you left off?</span>
-                  <div className="shell__resume-actions">
-                    <button
-                      type="button"
-                      className="button button--primary button--small"
-                      onClick={() => {
-                        const targetPath = resumePath
-                        setResumePath(null)
-                        setDismissedResumePath(targetPath)
-                        navigate(targetPath)
-                      }}
-                    >
-                      Return
-                    </button>
-                    <button
-                      type="button"
-                      className="button button--ghost button--small"
-                      onClick={() => {
-                        setDismissedResumePath(resumePath)
-                        setResumePath(null)
-                      }}
-                    >
-                      Dismiss
-                    </button>
-                  </div>
-                </div>
-              )}
-
-              <div
-                className="shell__store-switcher"
-                role="status"
-                aria-live="polite"
-              >
-                <span className="shell__store-label">Workspace</span>
-                <span
-                  className="shell__store-select"
-                  data-readonly
-                >
-                  {workspaceStatus}
-                </span>
-              </div>
-
-              {banner && (
-                <div
-                  className="shell__status-badge"
-                  data-variant={banner.variant}
-                  role="status"
-                  aria-live="polite"
-                  title={banner.message}
-                >
-                  <span
-                    className={`shell__status-dot${
-                      banner.pulse ? ' is-pulsing' : ''
-                    }`}
-                    aria-hidden="true"
-                  />
-                  <span className="shell__status-label">
-                    {BADGE_LABELS[banner.variant]}
-                  </span>
-                  <span className="shell__sr-only">
-                    {banner.message}
-                  </span>
-                </div>
-              )}
-
-              <SupportTicketLauncher />
-
-              <div className="shell__account">
-                <span className="shell__account-email">
-                  {userEmail}
-                </span>
-                <button
-                  type="button"
-                  className="button button--primary button--small"
-                  onClick={() => signOut(auth)}
-                >
-                  Sign out
-                </button>
-              </div>
-            </div>
+            {navSection}
+            {controlsSection}
           </div>
         </div>
 
@@ -568,7 +549,43 @@ export default function Shell({ children }: { children: React.ReactNode }) {
       </header>
 
       <main className="shell__main">
-        <div className="shell__container">{children}</div>
+        <div className="shell__container shell__layout">
+          <aside className="shell__sidebar">
+            {navSection}
+          </aside>
+          <section className="shell__content">
+            {resumePath && (
+              <div className="shell__resume-banner" role="status" aria-live="polite">
+                <span>Return to where you left off?</span>
+                <div className="shell__resume-actions">
+                  <button
+                    type="button"
+                    className="button button--primary button--small"
+                    onClick={() => {
+                      const targetPath = resumePath
+                      setResumePath(null)
+                      setDismissedResumePath(targetPath)
+                      navigate(targetPath)
+                    }}
+                  >
+                    Return
+                  </button>
+                  <button
+                    type="button"
+                    className="button button--ghost button--small"
+                    onClick={() => {
+                      setDismissedResumePath(resumePath)
+                      setResumePath(null)
+                    }}
+                  >
+                    Dismiss
+                  </button>
+                </div>
+              </div>
+            )}
+            <div className="shell__content-inner">{children}</div>
+          </section>
+        </div>
       </main>
     </div>
   )
