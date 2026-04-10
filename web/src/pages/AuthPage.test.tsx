@@ -8,6 +8,8 @@ import AuthPage from './AuthPage'
 const mockAuth = { signOut: vi.fn(async () => {}) }
 const mockSignInWithEmailAndPassword = vi.fn()
 const mockCreateUserWithEmailAndPassword = vi.fn()
+const mockSignInWithPopup = vi.fn()
+const mockGoogleAuthProviderSetCustomParameters = vi.fn()
 const mockPersistSession = vi.fn(async () => {})
 const mockResolveStoreAccess = vi.fn(async () => ({
   storeId: 'store-1',
@@ -29,6 +31,12 @@ vi.mock('../firebase', () => ({
 vi.mock('firebase/auth', () => ({
   createUserWithEmailAndPassword: (...args: unknown[]) => mockCreateUserWithEmailAndPassword(...args),
   signInWithEmailAndPassword: (...args: unknown[]) => mockSignInWithEmailAndPassword(...args),
+  signInWithPopup: (...args: unknown[]) => mockSignInWithPopup(...args),
+  GoogleAuthProvider: class {
+    setCustomParameters(...args: unknown[]) {
+      mockGoogleAuthProviderSetCustomParameters(...args)
+    }
+  },
 }))
 
 vi.mock('firebase/firestore', () => ({
@@ -64,6 +72,8 @@ describe('AuthPage', () => {
   beforeEach(() => {
     mockSignInWithEmailAndPassword.mockReset()
     mockCreateUserWithEmailAndPassword.mockReset()
+    mockSignInWithPopup.mockReset()
+    mockGoogleAuthProviderSetCustomParameters.mockReset()
     mockPersistSession.mockClear()
     mockResolveStoreAccess.mockClear()
     mockInitializeStore.mockClear()
@@ -101,5 +111,24 @@ describe('AuthPage', () => {
 
     const successToast = mockPublish.mock.calls.find(([options]) => options.tone === 'success')?.[0]
     expect(successToast?.message).toBe('Welcome back! Redirecting…')
+  })
+
+  it('supports Google sign in from login page', async () => {
+    const user = userEvent.setup()
+    mockSignInWithPopup.mockResolvedValueOnce({ user: { uid: 'google-user-1' } })
+
+    render(
+      <MemoryRouter>
+        <AuthPage />
+      </MemoryRouter>,
+    )
+
+    await user.click(screen.getByRole('button', { name: /Continue with Google/i }))
+
+    await waitFor(() => expect(mockSignInWithPopup).toHaveBeenCalledTimes(1))
+    expect(mockGoogleAuthProviderSetCustomParameters).toHaveBeenCalledWith({
+      prompt: 'select_account',
+    })
+    await waitFor(() => expect(mockPersistSession).toHaveBeenCalledTimes(2))
   })
 })
