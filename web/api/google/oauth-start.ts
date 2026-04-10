@@ -16,6 +16,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const user = await requireApiUser(req)
     const storeId = requireStoreId(req.body?.storeId)
     await requireStoreMembership(user.uid, storeId)
+    const requestedAccountEmail = typeof req.body?.accountEmail === 'string' ? req.body.accountEmail.trim() : ''
 
     const payload = await buildGoogleOAuthStartUrl({
       uid: user.uid,
@@ -24,7 +25,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       csrfToken: typeof req.body?.csrfToken === 'string' ? req.body.csrfToken : '',
       adsCustomerId: typeof req.body?.customerId === 'string' ? req.body.customerId.trim() : '',
       adsManagerId: typeof req.body?.managerId === 'string' ? req.body.managerId.trim() : '',
-      accountEmail: typeof req.body?.accountEmail === 'string' ? req.body.accountEmail.trim() : user.email,
+      accountEmail: requestedAccountEmail || user.email,
     })
 
     return res.status(200).json(payload)
