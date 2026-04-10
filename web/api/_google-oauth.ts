@@ -203,8 +203,19 @@ export async function storeUnifiedGoogleTokens(params: {
   adsManagerId?: string
   accountEmail?: string
 }) {
+  const settingsRef = db().doc(`storeSettings/${params.storeId}`)
+  const existingSettings = await settingsRef.get()
+  const existingData = (existingSettings.data() ?? {}) as Record<string, any>
+  const existingIntegrations = (existingData.integrations ?? {}) as Record<string, any>
+  const existingGoogleOAuth = (existingIntegrations.googleOAuth ?? {}) as Record<string, unknown>
+  const existingGoogleBusiness = (existingIntegrations.googleBusinessProfile ?? {}) as Record<string, unknown>
+  const existingGoogleAds = (existingIntegrations.googleAds ?? {}) as Record<string, unknown>
+  const existingGoogleMerchant = (existingIntegrations.googleMerchant ?? {}) as Record<string, unknown>
+
   const accessToken = typeof params.tokenPayload.access_token === 'string' ? params.tokenPayload.access_token : ''
   const refreshToken = typeof params.tokenPayload.refresh_token === 'string' ? params.tokenPayload.refresh_token : ''
+  const sharedRefreshToken =
+    refreshToken || (typeof existingGoogleOAuth.refreshToken === 'string' ? existingGoogleOAuth.refreshToken : '')
   const tokenType = typeof params.tokenPayload.token_type === 'string' ? params.tokenPayload.token_type : 'Bearer'
   const scope = typeof params.tokenPayload.scope === 'string' ? params.tokenPayload.scope : ''
   if (!accessToken) throw new Error('missing-access-token')
@@ -212,7 +223,7 @@ export async function storeUnifiedGoogleTokens(params: {
   const integrations: Record<string, unknown> = {
     googleOAuth: {
       accessToken,
-      refreshToken: refreshToken || FieldValue.delete(),
+      refreshToken: sharedRefreshToken || FieldValue.delete(),
       tokenType,
       scope,
       grantedScopes: Array.from(parseGrantedScopes(scope)),
@@ -223,9 +234,11 @@ export async function storeUnifiedGoogleTokens(params: {
   }
 
   if (params.integrationHints.includes('business')) {
+    const businessRefreshToken =
+      refreshToken || (typeof existingGoogleBusiness.refreshToken === 'string' ? existingGoogleBusiness.refreshToken : '')
     integrations.googleBusinessProfile = {
       accessToken,
-      refreshToken: refreshToken || FieldValue.delete(),
+      refreshToken: businessRefreshToken || FieldValue.delete(),
       tokenType,
       scope,
       oauthUserId: params.uid,
@@ -234,9 +247,11 @@ export async function storeUnifiedGoogleTokens(params: {
     }
   }
   if (params.integrationHints.includes('ads')) {
+    const adsRefreshToken =
+      refreshToken || (typeof existingGoogleAds.refreshToken === 'string' ? existingGoogleAds.refreshToken : '')
     integrations.googleAds = {
       accessToken,
-      refreshToken: refreshToken || FieldValue.delete(),
+      refreshToken: adsRefreshToken || FieldValue.delete(),
       tokenType,
       scope,
       connectedByUid: params.uid,
@@ -248,9 +263,11 @@ export async function storeUnifiedGoogleTokens(params: {
     }
   }
   if (params.integrationHints.includes('merchant')) {
+    const merchantRefreshToken =
+      refreshToken || (typeof existingGoogleMerchant.refreshToken === 'string' ? existingGoogleMerchant.refreshToken : '')
     integrations.googleMerchant = {
       accessToken,
-      refreshToken: refreshToken || FieldValue.delete(),
+      refreshToken: merchantRefreshToken || FieldValue.delete(),
       tokenType,
       scope,
       oauthUserId: params.uid,
@@ -273,7 +290,7 @@ export async function storeUnifiedGoogleTokens(params: {
     }
   }
 
-  await db().doc(`storeSettings/${params.storeId}`).set(updatePayload, { merge: true })
+  await settingsRef.set(updatePayload, { merge: true })
 }
 
 export const GOOGLE_REQUIRED_SCOPE = INTEGRATION_SCOPES
