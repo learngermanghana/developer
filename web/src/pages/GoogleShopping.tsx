@@ -11,7 +11,6 @@ import {
 } from '../api/googleShopping'
 import { db } from '../firebase'
 import { useActiveStore } from '../hooks/useActiveStore'
-import GoogleConnectionStatusCard from '../components/GoogleConnectionStatusCard'
 import { useGoogleIntegrationStatus } from '../hooks/useGoogleIntegrationStatus'
 import { clearGoogleOAuthQueryState, parseGoogleOAuthQueryState } from '../utils/googleOAuthCallback'
 import './GoogleShopping.css'
@@ -282,7 +281,6 @@ export default function GoogleShopping() {
 
       {step === 'connect' && (
         <>
-          {storeId ? <GoogleConnectionStatusCard storeId={storeId} currentIntegration="merchant" message={status} /> : null}
           <section className="google-shopping-panel">
             <h2>{stateTitle}</h2>
             <p>
