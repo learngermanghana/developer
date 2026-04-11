@@ -1,4 +1,7 @@
 import React from 'react'
+
+import GoogleConnectionStatusCard from '../components/GoogleConnectionStatusCard'
+import { useActiveStore } from '../hooks/useActiveStore'
 import { Link, useLocation } from 'react-router-dom'
 
 import './GoogleConnect.css'
@@ -33,6 +36,7 @@ const TABS: GoogleToolTab[] = [
 
 export default function GoogleConnect() {
   const location = useLocation()
+  const { storeId } = useActiveStore()
 
   return (
     <main className="google-connect-page">
@@ -69,6 +73,8 @@ export default function GoogleConnect() {
           )
         })}
       </section>
+
+      {storeId ? <GoogleConnectionStatusCard storeId={storeId} /> : null}
 
       <section className="google-connect-page__panel" aria-label="Suggested sequence">
         <h3>Recommended setup order</h3>

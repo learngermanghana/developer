@@ -1,16 +1,12 @@
-import React, { useEffect, useState } from 'react'
+import React from 'react'
 
 import GoogleBusinessMediaUploader from '../components/GoogleBusinessMediaUploader'
-import GoogleConnectionStatusCard from '../components/GoogleConnectionStatusCard'
 import { useActiveStore } from '../hooks/useActiveStore'
 import { useGoogleIntegrationStatus } from '../hooks/useGoogleIntegrationStatus'
-import { clearGoogleOAuthQueryState, parseGoogleOAuthQueryState } from '../utils/googleOAuthCallback'
 import './GoogleShopping.css'
 
 export default function GoogleBusinessProfile() {
   const { storeId } = useActiveStore()
-  const [message, setMessage] = useState('')
-
   const {
     isLoading,
     isStartingOAuth,
@@ -18,32 +14,13 @@ export default function GoogleBusinessProfile() {
     hasGoogleConnection,
     buttonLabel,
     stateTitle,
-    error,
     startOAuth,
   } = useGoogleIntegrationStatus({
     integration: 'business',
     storeId,
   })
 
-  useEffect(() => {
-    if (typeof window === 'undefined') return
-    const queryState = parseGoogleOAuthQueryState(window.location.search)
-    if (!queryState.status) return
 
-    if (queryState.status === 'success') {
-      setMessage(queryState.message || 'Google connected successfully.')
-    } else {
-      setMessage(queryState.message || 'Google OAuth failed.')
-    }
-
-    const nextUrl = clearGoogleOAuthQueryState(window.location.href)
-    window.history.replaceState({}, '', nextUrl)
-  }, [])
-
-  useEffect(() => {
-    if (!error) return
-    setMessage(error)
-  }, [error])
 
   return (
     <main className="google-shopping-page">
@@ -61,8 +38,6 @@ export default function GoogleBusinessProfile() {
         </section>
       ) : (
         <>
-          <GoogleConnectionStatusCard storeId={storeId} currentIntegration="business" message={message} />
-
           <section className="google-shopping-panel">
             <h2>{stateTitle}</h2>
             <p>
