@@ -109,6 +109,16 @@
   justify-content: flex-start;
 }
 
+.ads-campaigns__checkbox-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+}
+
+.ads-campaigns__checkbox-row input[type='checkbox'] {
+  margin-top: 2px;
+}
+
 .ads-campaigns__import-success {
   border: 1px solid #bbf7d0;
   background: #f0fdf4;

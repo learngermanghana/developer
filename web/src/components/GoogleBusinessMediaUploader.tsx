@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react'
+import React, { useCallback, useEffect, useMemo, useState } from 'react'
 
 import {
   listGoogleBusinessLocations,
@@ -77,51 +77,43 @@ export default function GoogleBusinessMediaUploader({ storeId, onReconnectGoogle
   const [locationMessage, setLocationMessage] = useState('')
   const [uploadedResult, setUploadedResult] = useState<{ thumbnailUrl: string; googleUrl: string; uploadedAt: string } | null>(null)
 
-  useEffect(() => {
-    if (!storeId) return
-    let mounted = true
-
+  const loadLocations = useCallback(async (): Promise<void> => {
     setLocationState('loading')
     setLocationMessage('')
+    try {
+      const options = await listGoogleBusinessLocations({ storeId })
+      setLocations(options)
+      setSelectedLocationKey(options[0] ? `${options[0].accountId}:${options[0].locationId}` : '')
 
-    listGoogleBusinessLocations({ storeId })
-      .then((options) => {
-        if (!mounted) return
+      if (!options.length) {
+        setLocationState('empty')
+        return
+      }
 
-        setLocations(options)
-        setSelectedLocationKey(options[0] ? `${options[0].accountId}:${options[0].locationId}` : '')
+      setLocationState('ready')
+    } catch (error) {
+      const parsed = parseGoogleBusinessApiError(error)
+      if (parsed.kind === 'not_connected') {
+        setLocationState('not_connected')
+        setLocationMessage(getLocationMessage('not_connected', parsed.message))
+        return
+      }
 
-        if (!options.length) {
-          setLocationState('empty')
-          return
-        }
+      if (parsed.kind === 'missing_scope') {
+        setLocationState('missing_scope')
+        setLocationMessage(getLocationMessage('missing_scope', parsed.message))
+        return
+      }
 
-        setLocationState('ready')
-      })
-      .catch((error) => {
-        if (!mounted) return
-
-        const parsed = parseGoogleBusinessApiError(error)
-        if (parsed.kind === 'not_connected') {
-          setLocationState('not_connected')
-          setLocationMessage(getLocationMessage('not_connected', parsed.message))
-          return
-        }
-
-        if (parsed.kind === 'missing_scope') {
-          setLocationState('missing_scope')
-          setLocationMessage(getLocationMessage('missing_scope', parsed.message))
-          return
-        }
-
-        setLocationState('error')
-        setLocationMessage(parsed.message || getLocationMessage('error', ''))
-      })
-
-    return () => {
-      mounted = false
+      setLocationState('error')
+      setLocationMessage(parsed.message || getLocationMessage('error', ''))
     }
   }, [storeId])
+
+  useEffect(() => {
+    if (!storeId) return
+    void loadLocations()
+  }, [loadLocations, storeId])
 
   useEffect(() => {
     if (!file) {
@@ -276,6 +268,17 @@ export default function GoogleBusinessMediaUploader({ storeId, onReconnectGoogle
         <article className="google-shopping-page__status" aria-live="polite">
           <h3>{locationState === 'empty' ? 'No Google Business locations found.' : 'Google Business setup needed'}</h3>
           <p>{getLocationMessage(locationState, locationMessage)}</p>
+          {locationState === 'empty' ? (
+            <ul>
+              <li>Confirm the connected Google account is an owner/manager of the Business Profile.</li>
+              <li>If the business was just created, wait a few minutes and refresh.</li>
+              <li>Make sure at least one location exists (single-location or location group).</li>
+            </ul>
+          ) : null}
+          <div className="google-shopping-panel__actions">
+            <button type="button" onClick={() => void loadLocations()} disabled={isReconnectingGoogle || uploadState === 'loading'}>
+              Refresh locations
+            </button>
           {onReconnectGoogle ? (
             <button type="button" onClick={onReconnectGoogle} disabled={isReconnectingGoogle}>
               {isReconnectingGoogle
@@ -285,6 +288,7 @@ export default function GoogleBusinessMediaUploader({ storeId, onReconnectGoogle
                   : 'Reconnect Google'}
             </button>
           ) : null}
+          </div>
         </article>
       )}
 
