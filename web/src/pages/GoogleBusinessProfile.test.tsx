@@ -7,6 +7,7 @@ import GoogleBusinessProfile from './GoogleBusinessProfile'
 
 const mockUseActiveStore = vi.fn()
 const mockUseGoogleIntegrationStatus = vi.fn()
+const mockListGoogleBusinessAccounts = vi.fn()
 const mockListGoogleBusinessLocations = vi.fn()
 const mockUploadGoogleBusinessLocationMedia = vi.fn()
 
@@ -19,6 +20,7 @@ vi.mock('../hooks/useGoogleIntegrationStatus', () => ({
 }))
 
 vi.mock('../api/googleBusinessProfile', () => ({
+  listGoogleBusinessAccounts: (...args: unknown[]) => mockListGoogleBusinessAccounts(...args),
   listGoogleBusinessLocations: (...args: unknown[]) => mockListGoogleBusinessLocations(...args),
   uploadGoogleBusinessLocationMedia: (...args: unknown[]) => mockUploadGoogleBusinessLocationMedia(...args),
   parseGoogleBusinessApiError: (error: unknown) => ({
@@ -33,10 +35,17 @@ describe('GoogleBusinessProfile', () => {
   beforeEach(() => {
     mockUseActiveStore.mockReset()
     mockUseGoogleIntegrationStatus.mockReset()
+    mockListGoogleBusinessAccounts.mockReset()
     mockListGoogleBusinessLocations.mockReset()
     mockUploadGoogleBusinessLocationMedia.mockReset()
 
     mockUseActiveStore.mockReturnValue({ storeId: 'store-1' })
+    mockListGoogleBusinessAccounts.mockResolvedValue([
+      {
+        accountId: 'acc-1',
+        accountName: 'Main Account',
+      },
+    ])
     mockListGoogleBusinessLocations.mockResolvedValue([
       {
         accountId: 'acc-1',
@@ -100,6 +109,7 @@ describe('GoogleBusinessProfile', () => {
       </MemoryRouter>,
     )
 
+    await user.click(await screen.findByRole('button', { name: /load locations/i }))
     const fileInput = await screen.findByLabelText(/choose photo/i)
     const file = new File(['image'], 'store.jpg', { type: 'image/jpeg' })
     await user.upload(fileInput, file)

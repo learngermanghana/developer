@@ -525,15 +525,18 @@ async function listGoogleBusinessAccountsAndLocations(params: {
       if (!accountId) return null
       if (params.accountId && params.accountId !== accountId) return null
 
-      const locationsPayload = await googleApiRequest<{ locations?: Array<Record<string, unknown>> }>({
-        url: `${GOOGLE_BUSINESS_INFO_API_BASE}/accounts/${accountId}/locations?readMask=name,title`,
-        accessToken: params.accessToken,
-      })
+      let locations: GoogleBusinessLocation[] = []
+      if (params.accountId) {
+        const locationsPayload = await googleApiRequest<{ locations?: Array<Record<string, unknown>> }>({
+          url: `${GOOGLE_BUSINESS_INFO_API_BASE}/accounts/${accountId}/locations?readMask=name,title`,
+          accessToken: params.accessToken,
+        })
 
-      const locations = (Array.isArray(locationsPayload.locations) ? locationsPayload.locations : []).map((loc) => ({
-        name: normalizeString(loc.name),
-        title: normalizeString(loc.title),
-      }))
+        locations = (Array.isArray(locationsPayload.locations) ? locationsPayload.locations : []).map((loc) => ({
+          name: normalizeString(loc.name),
+          title: normalizeString(loc.title),
+        }))
+      }
 
       return {
         accountId,

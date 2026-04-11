@@ -1,9 +1,11 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react'
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
 import {
+  listGoogleBusinessAccounts,
   listGoogleBusinessLocations,
   parseGoogleBusinessApiError,
   uploadGoogleBusinessLocationMedia,
+  type GoogleBusinessAccountOption,
   type GoogleBusinessLocationOption,
 } from '../api/googleBusinessProfile'
 
@@ -67,6 +69,8 @@ function getLocationMessage(state: LocationState, fallbackMessage: string): stri
 
 export default function GoogleBusinessMediaUploader({ storeId, onReconnectGoogle, isReconnectingGoogle = false }: Props) {
   const [locations, setLocations] = useState<GoogleBusinessLocationOption[]>([])
+  const [accounts, setAccounts] = useState<GoogleBusinessAccountOption[]>([])
+  const [selectedAccountId, setSelectedAccountId] = useState('')
   const [selectedLocationKey, setSelectedLocationKey] = useState('')
   const [category, setCategory] = useState<(typeof CATEGORIES)[number]>('ADDITIONAL')
   const [file, setFile] = useState<File | null>(null)
@@ -76,21 +80,27 @@ export default function GoogleBusinessMediaUploader({ storeId, onReconnectGoogle
   const [locationState, setLocationState] = useState<LocationState>('idle')
   const [locationMessage, setLocationMessage] = useState('')
   const [uploadedResult, setUploadedResult] = useState<{ thumbnailUrl: string; googleUrl: string; uploadedAt: string } | null>(null)
+  const debounceTimerRef = useRef<number | null>(null)
 
-  const loadLocations = useCallback(async (): Promise<void> => {
+  const loadAccounts = useCallback(async (): Promise<void> => {
     setLocationState('loading')
     setLocationMessage('')
     try {
-      const options = await listGoogleBusinessLocations({ storeId })
-      setLocations(options)
-      setSelectedLocationKey(options[0] ? `${options[0].accountId}:${options[0].locationId}` : '')
+      const options = await listGoogleBusinessAccounts({ storeId })
+      setAccounts(options)
+      setSelectedAccountId((current) => {
+        if (current && options.some((option) => option.accountId === current)) return current
+        return options[0]?.accountId || ''
+      })
+      setLocations([])
+      setSelectedLocationKey('')
 
       if (!options.length) {
         setLocationState('empty')
         return
       }
 
-      setLocationState('ready')
+      setLocationState('idle')
     } catch (error) {
       const parsed = parseGoogleBusinessApiError(error)
       if (parsed.kind === 'not_connected') {
@@ -110,10 +120,41 @@ export default function GoogleBusinessMediaUploader({ storeId, onReconnectGoogle
     }
   }, [storeId])
 
+  const loadLocations = useCallback(async (params?: { forceRefresh?: boolean }): Promise<void> => {
+    if (!selectedAccountId) return
+    setLocationState('loading')
+    setLocationMessage('')
+    try {
+      const options = await listGoogleBusinessLocations({ storeId, accountId: selectedAccountId, forceRefresh: params?.forceRefresh })
+      setLocations(options)
+      setSelectedLocationKey((current) => {
+        if (current && options.some((option) => `${option.accountId}:${option.locationId}` === current)) return current
+        return options[0] ? `${options[0].accountId}:${options[0].locationId}` : ''
+      })
+      setLocationState(options.length ? 'ready' : 'empty')
+    } catch (error) {
+      const parsed = parseGoogleBusinessApiError(error)
+      if (parsed.kind === 'not_connected') {
+        setLocationState('not_connected')
+        setLocationMessage(getLocationMessage('not_connected', parsed.message))
+        return
+      }
+
+      if (parsed.kind === 'missing_scope') {
+        setLocationState('missing_scope')
+        setLocationMessage(getLocationMessage('missing_scope', parsed.message))
+        return
+      }
+
+      setLocationState('error')
+      setLocationMessage(parsed.message || getLocationMessage('error', ''))
+    }
+  }, [selectedAccountId, storeId])
+
   useEffect(() => {
     if (!storeId) return
-    void loadLocations()
-  }, [loadLocations, storeId])
+    void loadAccounts()
+  }, [loadAccounts, storeId])
 
   useEffect(() => {
     if (!file) {
@@ -131,7 +172,23 @@ export default function GoogleBusinessMediaUploader({ storeId, onReconnectGoogle
     return locations.find((option) => option.accountId === accountId && option.locationId === locationId) || null
   }, [locations, selectedLocationKey])
 
-  const uploadBlocked = locationState !== 'ready'
+  const uploadBlocked = locationState !== 'ready' || !selectedAccountId
+
+  const debouncedLoadLocations = useCallback(
+    (forceRefresh = false) => {
+      if (debounceTimerRef.current) window.clearTimeout(debounceTimerRef.current)
+      debounceTimerRef.current = window.setTimeout(() => {
+        void loadLocations({ forceRefresh })
+      }, 300)
+    },
+    [loadLocations],
+  )
+
+  useEffect(() => {
+    return () => {
+      if (debounceTimerRef.current) window.clearTimeout(debounceTimerRef.current)
+    }
+  }, [])
 
   async function handleUpload() {
     if (!selectedLocation) {
@@ -206,8 +263,40 @@ export default function GoogleBusinessMediaUploader({ storeId, onReconnectGoogle
       </div>
 
       <label>
+        <span>Google account</span>
+        <small className="google-shopping-panel__hint">Pick which Google Business account to load locations from.</small>
+        <select
+          value={selectedAccountId}
+          onChange={(event) => {
+            setSelectedAccountId(event.target.value)
+            setLocations([])
+            setSelectedLocationKey('')
+            setLocationState('idle')
+          }}
+          disabled={locationState === 'loading' || uploadState === 'loading'}
+        >
+          {!accounts.length && <option value="">No Google accounts available</option>}
+          {accounts.map((option) => (
+            <option key={option.accountId} value={option.accountId}>
+              {option.accountName}
+            </option>
+          ))}
+        </select>
+      </label>
+
+      <div className="google-shopping-panel__actions">
+        <button
+          type="button"
+          onClick={() => debouncedLoadLocations(false)}
+          disabled={!selectedAccountId || locationState === 'loading' || uploadState === 'loading'}
+        >
+          Load locations
+        </button>
+      </div>
+
+      <label>
         <span>Business location</span>
-        <small className="google-shopping-panel__hint">Select the Google business location you want to update.</small>
+        <small className="google-shopping-panel__hint">Select the Google business location you want to update after loading.</small>
         <select
           value={selectedLocationKey}
           onChange={(event) => setSelectedLocationKey(event.target.value)}
@@ -276,7 +365,11 @@ export default function GoogleBusinessMediaUploader({ storeId, onReconnectGoogle
             </ul>
           ) : null}
           <div className="google-shopping-panel__actions">
-            <button type="button" onClick={() => void loadLocations()} disabled={isReconnectingGoogle || uploadState === 'loading'}>
+            <button
+              type="button"
+              onClick={() => debouncedLoadLocations(true)}
+              disabled={!selectedAccountId || isReconnectingGoogle || uploadState === 'loading'}
+            >
               Refresh locations
             </button>
           {onReconnectGoogle ? (

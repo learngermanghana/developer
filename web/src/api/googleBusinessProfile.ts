@@ -7,6 +7,11 @@ export type GoogleBusinessLocationOption = {
   locationName: string
 }
 
+export type GoogleBusinessAccountOption = {
+  accountId: string
+  accountName: string
+}
+
 export type GoogleBusinessUploadResult = {
   media?: {
     name?: string
@@ -120,21 +125,35 @@ export function parseGoogleBusinessApiError(error: unknown) {
   }
 }
 
-export async function listGoogleBusinessLocations(params: { storeId: string }): Promise<GoogleBusinessLocationOption[]> {
-  const headers = await getAuthHeader()
-  const response = await fetch('/api/google-business/locations', {
-    method: 'POST',
-    headers: {
-      ...headers,
-      'content-type': 'application/json',
-    },
-    body: JSON.stringify({ storeId: params.storeId }),
-  })
+const CACHE_TTL_MS = 60_000
 
-  const payload = await parseApiResponse<{
-    accounts?: Array<{ accountId?: string; accountName?: string; locations?: Array<{ name?: string; title?: string }> }>
-  }>(response)
+const accountsCache = new Map<string, { expiresAt: number; data: GoogleBusinessAccountOption[] }>()
+const locationsCache = new Map<string, { expiresAt: number; data: GoogleBusinessLocationOption[] }>()
 
+function getFreshCacheValue<T>(entry: { expiresAt: number; data: T } | undefined): T | null {
+  if (!entry) return null
+  if (Date.now() > entry.expiresAt) return null
+  return entry.data
+}
+
+function normalizeAccounts(payload: {
+  accounts?: Array<{ accountId?: string; accountName?: string; locations?: Array<{ name?: string; title?: string }> }>
+}): GoogleBusinessAccountOption[] {
+  return (payload.accounts ?? [])
+    .map((account) => {
+      const accountId = typeof account.accountId === 'string' ? account.accountId : ''
+      if (!accountId) return null
+      return {
+        accountId,
+        accountName: typeof account.accountName === 'string' ? account.accountName : accountId,
+      }
+    })
+    .filter((option): option is GoogleBusinessAccountOption => Boolean(option))
+}
+
+function normalizeLocations(payload: {
+  accounts?: Array<{ accountId?: string; accountName?: string; locations?: Array<{ name?: string; title?: string }> }>
+}): GoogleBusinessLocationOption[] {
   const options: GoogleBusinessLocationOption[] = []
 
   for (const account of payload.accounts ?? []) {
@@ -153,6 +172,63 @@ export async function listGoogleBusinessLocations(params: { storeId: string }): 
     }
   }
 
+  return options
+}
+
+export function clearGoogleBusinessCache() {
+  accountsCache.clear()
+  locationsCache.clear()
+}
+
+export async function listGoogleBusinessAccounts(params: { storeId: string; forceRefresh?: boolean }): Promise<GoogleBusinessAccountOption[]> {
+  const cacheKey = params.storeId
+  if (!params.forceRefresh) {
+    const cached = getFreshCacheValue(accountsCache.get(cacheKey))
+    if (cached) return cached
+  }
+
+  const headers = await getAuthHeader()
+  const response = await fetch('/api/google-business/locations', {
+    method: 'POST',
+    headers: {
+      ...headers,
+      'content-type': 'application/json',
+    },
+    body: JSON.stringify({ storeId: params.storeId }),
+  })
+
+  const payload = await parseApiResponse<{
+    accounts?: Array<{ accountId?: string; accountName?: string; locations?: Array<{ name?: string; title?: string }> }>
+  }>(response)
+
+  const accounts = normalizeAccounts(payload)
+  accountsCache.set(cacheKey, { data: accounts, expiresAt: Date.now() + CACHE_TTL_MS })
+  return accounts
+}
+
+export async function listGoogleBusinessLocations(params: { storeId: string; accountId: string; forceRefresh?: boolean }): Promise<GoogleBusinessLocationOption[]> {
+  const cacheKey = `${params.storeId}:${params.accountId}`
+  if (!params.forceRefresh) {
+    const cached = getFreshCacheValue(locationsCache.get(cacheKey))
+    if (cached) return cached
+  }
+
+  const headers = await getAuthHeader()
+  const response = await fetch('/api/google-business/locations', {
+    method: 'POST',
+    headers: {
+      ...headers,
+      'content-type': 'application/json',
+    },
+    body: JSON.stringify({ storeId: params.storeId, accountId: params.accountId }),
+  })
+
+  const payload = await parseApiResponse<{
+    accounts?: Array<{ accountId?: string; accountName?: string; locations?: Array<{ name?: string; title?: string }> }>
+  }>(response)
+
+  const options = normalizeLocations(payload)
+  locationsCache.set(cacheKey, { data: options, expiresAt: Date.now() + CACHE_TTL_MS })
   return options
 }
 
