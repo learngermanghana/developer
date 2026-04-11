@@ -423,6 +423,8 @@ async function saveGoogleMerchantConnection(params: {
   const settingsData = asRecord(settingsSnap.data())
   const googleShopping = asRecord(settingsData.googleShopping)
   const catalogSync = asRecord(googleShopping.catalogSync)
+  const integrations = asRecord(settingsData.integrations)
+  const existingGoogleMerchant = asRecord(integrations.googleMerchant)
 
   const accessToken = normalizeString(params.tokenPayload.access_token)
   const refreshToken = normalizeString(params.tokenPayload.refresh_token)
@@ -438,6 +440,7 @@ async function saveGoogleMerchantConnection(params: {
   })
   const existingIntegrationBaseUrl = normalizeString(catalogSync.integrationBaseUrl)
   const existingAutoSyncEnabled = catalogSync.autoSyncEnabled === false ? false : true
+  const canonicalRefreshToken = refreshToken || normalizeString(existingGoogleMerchant.refreshToken)
 
   const catalogSyncUpdate: Record<string, unknown> = {
     accessToken,
@@ -456,6 +459,18 @@ async function saveGoogleMerchantConnection(params: {
 
   await settingsRef.set(
     {
+      integrations: {
+        googleMerchant: {
+          selectedMerchantId: params.merchantId,
+          accessToken,
+          refreshToken: canonicalRefreshToken || FieldValue.delete(),
+          tokenType: tokenType || 'Bearer',
+          scope,
+          oauthUserId: params.uid,
+          updatedAt: FieldValue.serverTimestamp(),
+          ...(tokenExpiry ? { expiresAt: tokenExpiry } : {}),
+        },
+      },
       googleShopping: {
         connection: {
           connected: true,
@@ -549,18 +564,20 @@ async function resolveGoogleMerchantAuth(storeId: string): Promise<{ accessToken
   const settingsRef = db.collection('storeSettings').doc(storeId)
   const settingsSnap = await settingsRef.get()
   const settingsData = asRecord(settingsSnap.data())
+  const integrations = asRecord(settingsData.integrations)
+  const googleMerchant = asRecord(integrations.googleMerchant)
   const googleShopping = asRecord(settingsData.googleShopping)
   const connection = asRecord(googleShopping.connection)
   const catalogSync = asRecord(googleShopping.catalogSync)
 
-  const merchantId = normalizeString(connection.merchantId)
+  const merchantId = normalizeString(googleMerchant.selectedMerchantId) || normalizeString(connection.merchantId)
   if (connection.connected !== true || !merchantId) {
     throw new Error('merchant-not-connected')
   }
 
-  let accessToken = normalizeString(catalogSync.accessToken)
-  const refreshToken = normalizeString(catalogSync.refreshToken)
-  const tokenExpiryRaw = catalogSync.tokenExpiry
+  let accessToken = normalizeString(googleMerchant.accessToken) || normalizeString(catalogSync.accessToken)
+  const refreshToken = normalizeString(googleMerchant.refreshToken) || normalizeString(catalogSync.refreshToken)
+  const tokenExpiryRaw = googleMerchant.expiresAt || catalogSync.tokenExpiry
 
   const expiryMillis = tokenExpiryMillis(tokenExpiryRaw)
   const tokenExpiringSoon = expiryMillis > 0 && expiryMillis <= Date.now() + 30_000
@@ -583,6 +600,13 @@ async function resolveGoogleMerchantAuth(storeId: string): Promise<{ accessToken
 
     await settingsRef.set(
       {
+        integrations: {
+          googleMerchant: {
+            accessToken: refreshedAccessToken,
+            updatedAt: FieldValue.serverTimestamp(),
+            ...(refreshedTokenExpiry ? { expiresAt: refreshedTokenExpiry } : {}),
+          },
+        },
         googleShopping: {
           catalogSync: {
             accessToken: refreshedAccessToken,
@@ -590,10 +614,6 @@ async function resolveGoogleMerchantAuth(storeId: string): Promise<{ accessToken
             tokenScope: refreshedScope,
             tokenUpdatedAt: FieldValue.serverTimestamp(),
             ...(refreshedTokenExpiry ? { tokenExpiry: refreshedTokenExpiry } : {}),
-          },
-          status: {
-            updatedAt: FieldValue.serverTimestamp(),
-            refreshTokenMissing: false,
           },
         },
       },
