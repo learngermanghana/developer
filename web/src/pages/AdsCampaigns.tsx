@@ -29,6 +29,7 @@ type GoogleAdsConnection = {
 type BillingConfirmation = {
   confirmed: boolean
   legalName: string
+  consentChecked?: boolean
   confirmedAt?: unknown
 }
 
@@ -76,6 +77,7 @@ const DEFAULT_SETTINGS: AdsAutomationSettings = {
   billing: {
     confirmed: false,
     legalName: '',
+    consentChecked: false,
   },
   brief: {
     goal: 'leads',
@@ -139,6 +141,7 @@ function parseSettings(raw: Record<string, unknown> | undefined): AdsAutomationS
     billing: {
       confirmed: billingRaw.confirmed === true,
       legalName: typeof billingRaw.legalName === 'string' ? billingRaw.legalName : '',
+      consentChecked: billingRaw.consentChecked === true,
       confirmedAt: billingRaw.confirmedAt,
     },
     brief: {
@@ -327,6 +330,10 @@ export default function AdsCampaigns() {
   async function handleBillingConfirmClick() {
     if (!settings.billing.legalName.trim()) {
       setNotice('Enter the business legal name used for billing.')
+      return
+    }
+    if (!settings.billing.consentChecked) {
+      setNotice('Confirm consent to allow Sedifex to manage Google Ads spend for this business.')
       return
     }
 
@@ -540,7 +547,10 @@ export default function AdsCampaigns() {
       <section className="ads-campaigns__section" aria-labelledby="billing-ownership">
         <div>
           <h2 id="billing-ownership">2) Confirm billing ownership</h2>
-          <p>Capture consent before Sedifex starts spending ad budget.</p>
+          <p>
+            This step records internal approval for ad spend on this workspace. It does not open Google
+            and does not charge your card by itself.
+          </p>
         </div>
 
         <form
@@ -567,11 +577,33 @@ export default function AdsCampaigns() {
               placeholder="Sedifex Biz Ltd"
             />
           </label>
+          <div>
+            <span>Owner consent</span>
+            <div className="ads-campaigns__checkbox-row">
+              <input
+                id="billing-consent"
+                type="checkbox"
+                checked={settings.billing.consentChecked === true}
+                onChange={event =>
+                  setSettings(previous => ({
+                    ...previous,
+                    billing: {
+                      ...previous.billing,
+                      consentChecked: event.target.checked,
+                    },
+                  }))
+                }
+              />
+              <label htmlFor="billing-consent">
+                I confirm I own this billing profile (or have permission) and authorize Sedifex to manage Google Ads spend.
+              </label>
+            </div>
+          </div>
           <div className="ads-campaigns__actions">
             <button
               type="button"
               className="button button--primary"
-              disabled={saving}
+              disabled={saving || !settings.billing.legalName.trim() || !settings.billing.consentChecked}
               onClick={handleBillingConfirmClick}
             >
               Confirm billing ownership
@@ -735,6 +767,9 @@ export default function AdsCampaigns() {
           <p>
             Use this when your campaign is already running in Google Ads and you want Sedifex to manage it.
             In Google Ads, open the campaign list and copy the Campaign ID from the “ID” column.
+          </p>
+          <p className="ads-campaigns__muted-note">
+            Nothing happens unless all prerequisites are ready: Google Ads connected, correct Customer ID, and a campaign ID that belongs to that customer.
           </p>
         </div>
         <form
