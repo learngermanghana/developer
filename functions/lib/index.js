@@ -32,8 +32,11 @@ var __importStar = (this && this.__importStar) || (function () {
         return result;
     };
 })();
+var __exportStar = (this && this.__exportStar) || function(m, exports) {
+    for (var p in m) if (p !== "default" && !Object.prototype.hasOwnProperty.call(exports, p)) __createBinding(exports, m, p);
+};
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.handlePaystackWebhook = exports.createBulkCreditsCheckout = exports.cancelPaystackSubscription = exports.createCheckout = exports.createPaystackCheckout = exports.sendBulkMessage = exports.emitProductWebhooks = exports.integrationTopSelling = exports.integrationCustomers = exports.integrationPublicCatalog = exports.integrationTikTokVideos = exports.integrationGallery = exports.integrationPromo = exports.integrationProducts = exports.tiktokOAuthCallback = exports.startTikTokConnect = exports.rotateIntegrationApiKey = exports.revokeIntegrationApiKey = exports.createIntegrationApiKey = exports.listIntegrationApiKeys = exports.listStoreProducts = exports.logPaymentReminder = exports.logReceiptShareAttempt = exports.logReceiptShare = exports.commitSale = exports.manageStaffAccount = exports.resolveStoreAccess = exports.initializeStore = exports.handleUserCreate = exports.googleBusinessUploadLocationMedia = exports.googleBusinessLocations = exports.googleShoppingSyncScheduled = exports.googleShoppingSync = exports.googleShoppingSetupConfig = exports.googleMerchantSelectAccount = exports.googleMerchantPendingAccounts = exports.googleMerchantOAuthCallback = exports.googleMerchantOAuthStart = exports.googleAdsMetricsSyncScheduled = exports.googleAdsMetricsSync = exports.googleAdsCampaign = exports.googleAdsOAuthCallback = exports.googleAdsOAuthStart = exports.checkSignupUnlock = void 0;
+exports.handlePaystackWebhook = exports.createBulkCreditsCheckout = exports.cancelPaystackSubscription = exports.createCheckout = exports.createPaystackCheckout = exports.sendBulkMessage = exports.emitProductWebhooks = exports.integrationTopSelling = exports.integrationCustomers = exports.integrationPublicCatalog = exports.integrationTikTokVideos = exports.integrationGallery = exports.integrationPromo = exports.integrationProducts = exports.tiktokOAuthCallback = exports.startTikTokConnect = exports.rotateIntegrationApiKey = exports.revokeIntegrationApiKey = exports.createIntegrationApiKey = exports.listIntegrationApiKeys = exports.listStoreProducts = exports.logPaymentReminder = exports.logReceiptShareAttempt = exports.logReceiptShare = exports.commitSale = exports.manageStaffAccount = exports.resolveStoreAccess = exports.initializeStore = exports.handleUserCreate = exports.googleBusinessUploadLocationMedia = exports.googleBusinessLocations = exports.googleAdsMetricsSyncScheduled = exports.googleAdsMetricsSync = exports.googleAdsCampaign = exports.googleAdsOAuthCallback = exports.googleAdsOAuthStart = exports.checkSignupUnlock = void 0;
 // functions/src/index.ts
 const functions = __importStar(require("firebase-functions/v1"));
 const crypto = __importStar(require("crypto"));
@@ -49,14 +52,7 @@ Object.defineProperty(exports, "googleAdsOAuthCallback", { enumerable: true, get
 Object.defineProperty(exports, "googleAdsCampaign", { enumerable: true, get: function () { return googleAds_1.googleAdsCampaign; } });
 Object.defineProperty(exports, "googleAdsMetricsSync", { enumerable: true, get: function () { return googleAds_1.googleAdsMetricsSync; } });
 Object.defineProperty(exports, "googleAdsMetricsSyncScheduled", { enumerable: true, get: function () { return googleAds_1.googleAdsMetricsSyncScheduled; } });
-var googleShopping_1 = require("./googleShopping");
-Object.defineProperty(exports, "googleMerchantOAuthStart", { enumerable: true, get: function () { return googleShopping_1.googleMerchantOAuthStart; } });
-Object.defineProperty(exports, "googleMerchantOAuthCallback", { enumerable: true, get: function () { return googleShopping_1.googleMerchantOAuthCallback; } });
-Object.defineProperty(exports, "googleMerchantPendingAccounts", { enumerable: true, get: function () { return googleShopping_1.googleMerchantPendingAccounts; } });
-Object.defineProperty(exports, "googleMerchantSelectAccount", { enumerable: true, get: function () { return googleShopping_1.googleMerchantSelectAccount; } });
-Object.defineProperty(exports, "googleShoppingSetupConfig", { enumerable: true, get: function () { return googleShopping_1.googleShoppingSetupConfig; } });
-Object.defineProperty(exports, "googleShoppingSync", { enumerable: true, get: function () { return googleShopping_1.googleShoppingSync; } });
-Object.defineProperty(exports, "googleShoppingSyncScheduled", { enumerable: true, get: function () { return googleShopping_1.googleShoppingSyncScheduled; } });
+__exportStar(require("./googleShopping"), exports);
 var googleBusinessProfile_1 = require("./googleBusinessProfile");
 Object.defineProperty(exports, "googleBusinessLocations", { enumerable: true, get: function () { return googleBusinessProfile_1.googleBusinessLocations; } });
 Object.defineProperty(exports, "googleBusinessUploadLocationMedia", { enumerable: true, get: function () { return googleBusinessProfile_1.googleBusinessUploadLocationMedia; } });

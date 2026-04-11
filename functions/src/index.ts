@@ -14,15 +14,7 @@ export {
   googleAdsMetricsSync,
   googleAdsMetricsSyncScheduled,
 } from './googleAds'
-export {
-  googleMerchantOAuthStart,
-  googleMerchantOAuthCallback,
-  googleMerchantPendingAccounts,
-  googleMerchantSelectAccount,
-  googleShoppingSetupConfig,
-  googleShoppingSync,
-  googleShoppingSyncScheduled,
-} from './googleShopping'
+export * from './googleShopping'
 export {
   googleBusinessLocations,
   googleBusinessUploadLocationMedia,
