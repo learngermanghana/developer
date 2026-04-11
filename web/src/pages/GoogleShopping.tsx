@@ -303,8 +303,14 @@ export default function GoogleShopping() {
       return {
         title: 'Choose your Merchant Center account',
         helper: 'Step 2: choose the Merchant Center account that Sedifex should sync to.',
-        cta: pendingAccounts.length > 1 ? 'Choose Merchant account' : 'Choose Merchant account',
-        onClick: pendingAccounts.length > 1 ? () => setStep('account') : connectGoogleMerchant,
+        // Always present a consistent call‑to‑action label. Even when there is only
+        // one pending account, the user should be able to explicitly confirm
+        // selection in the account step rather than being sent through OAuth again.
+        cta: 'Choose Merchant account',
+        // Instead of re‑initiating the OAuth flow when there is a single pending
+        // account, always take the user to the account selection step. The UI
+        // will display the available account(s) and allow confirmation.
+        onClick: () => setStep('account'),
       }
     }
     if (merchant.state === 'refresh_token_missing') {
@@ -408,7 +414,7 @@ export default function GoogleShopping() {
         )}
       </section>
 
-      {step === 'account' && pendingAccounts.length > 1 && (
+      {step === 'account' && pendingAccounts.length > 0 && (
         <section className="google-shopping-panel google-shopping-panel__picker">
           <h2>Choose your Merchant Center account</h2>
           <label>
