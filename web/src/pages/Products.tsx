@@ -27,6 +27,7 @@ import {
 import { normalizeBarcode } from '../utils/barcode'
 import { useStorePreferences } from '../hooks/useStorePreferences'
 import { useStoreBilling } from '../hooks/useStoreBilling'
+import { useWorkspaceIdentity } from '../hooks/useWorkspaceIdentity'
 import type { ItemType, Product } from '../types/product'
 import { ProductImageUploadError, uploadProductImage } from '../api/productImageUpload'
 import { requestAiAdvisor } from '../api/aiAdvisor'
@@ -208,6 +209,43 @@ function createDraftProductKey(): string {
 function buildProductImagePath(storeId: string, productKey: string, slot: number = 0): string {
   const safeSlot = Math.min(Math.max(slot, 0), 2)
   return `stores/${storeId}/products/${productKey}-${safeSlot + 1}.jpg`
+}
+
+function buildStoreBarcodePrefix(workspaceName: string | null, storeId: string | null): string {
+  const normalizedName = (workspaceName ?? '').replace(/[^a-z0-9]+/gi, '').toUpperCase()
+  if (normalizedName.length >= 3) {
+    return normalizedName.slice(0, 4)
+  }
+
+  const normalizedStoreId = (storeId ?? '').replace(/[^a-z0-9]+/gi, '').toUpperCase()
+  if (normalizedStoreId.length >= 3) {
+    return normalizedStoreId.slice(0, 4)
+  }
+
+  return 'ITEM'
+}
+
+function getNextBarcodeFromPrefix(prefix: string, products: Product[]): string {
+  const escapedPrefix = prefix.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+  const prefixedNumberPattern = new RegExp(`^${escapedPrefix}(\\d+)$`, 'i')
+
+  const maxCurrentNumber = products.reduce((max, product) => {
+    const candidates = [product.sku, product.barcode]
+    for (const candidate of candidates) {
+      if (typeof candidate !== 'string') continue
+      const compactCode = candidate.replace(/[^a-z0-9]+/gi, '').toUpperCase()
+      const match = compactCode.match(prefixedNumberPattern)
+      if (!match) continue
+      const candidateNumber = Number(match[1])
+      if (Number.isFinite(candidateNumber)) {
+        return Math.max(max, candidateNumber)
+      }
+    }
+    return max
+  }, 0)
+
+  const nextNumber = String(maxCurrentNumber + 1).padStart(4, '0')
+  return `${prefix}${nextNumber}`
 }
 
 function mapFirestoreProduct(id: string, data: Record<string, unknown>): Product {
@@ -447,6 +485,7 @@ export default function Products() {
   const user = useAuthUser()
   const { preferences } = useStorePreferences(activeStoreId)
   const { billing } = useStoreBilling()
+  const { name: workspaceName } = useWorkspaceIdentity()
   const { publish } = useToast()
   const [searchParams, setSearchParams] = useSearchParams()
 
@@ -460,6 +499,7 @@ export default function Products() {
   const [name, setName] = useState('')
   const [itemType, setItemType] = useState<ItemType>('product')
   const [sku, setSku] = useState('')
+  const [isSkuManuallyEdited, setIsSkuManuallyEdited] = useState(false)
   const [categoryInput, setCategoryInput] = useState('')
   const [priceInput, setPriceInput] = useState('')
   const [descriptionInput, setDescriptionInput] = useState('')
@@ -538,6 +578,20 @@ export default function Products() {
   )
 
   const canManageProducts = activeMembership?.role === 'owner'
+  const storeBarcodePrefix = useMemo(
+    () => buildStoreBarcodePrefix(workspaceName, activeStoreId),
+    [activeStoreId, workspaceName],
+  )
+  const suggestedSku = useMemo(
+    () => getNextBarcodeFromPrefix(storeBarcodePrefix, products),
+    [products, storeBarcodePrefix],
+  )
+
+  useEffect(() => {
+    if (itemType === 'service') return
+    if (isSkuManuallyEdited) return
+    setSku(suggestedSku)
+  }, [isSkuManuallyEdited, itemType, suggestedSku])
 
   /**
    * Load products for the active store
@@ -994,6 +1048,7 @@ export default function Products() {
       setName('')
       setItemType('product')
       setSku('')
+      setIsSkuManuallyEdited(false)
       setCategoryInput('')
       setPriceInput('')
       setDescriptionInput('')
@@ -1080,6 +1135,7 @@ export default function Products() {
     if (value === 'service') {
       // services should not have barcodes
       setSku('')
+      setIsSkuManuallyEdited(false)
       setExpiryInput('')
       setManufacturerInput('')
       setProductionDateInput('')
@@ -1526,12 +1582,17 @@ export default function Products() {
                   id="add-sku"
                   placeholder="Scan or type the barcode, or use an internal code"
                   value={sku}
-                  onChange={e => setSku(e.target.value)}
+                  onChange={e => {
+                    const nextValue = e.target.value
+                    setSku(nextValue)
+                    setIsSkuManuallyEdited(nextValue.trim().length > 0)
+                  }}
                 />
                 <p className="field__hint">
-                  If you scan barcodes, this should match the code on the product. We
-                  also store a normalized version (letters + digits) so camera scans work even if
-                  you add spaces or dashes.
+                  Barcode auto-fills as <strong>{storeBarcodePrefix}</strong> + numbers (for example{' '}
+                  <strong>{suggestedSku}</strong>). You can overwrite it anytime. We also store a
+                  normalized version (letters + digits) so camera scans work even if you add spaces
+                  or dashes.
                 </p>
               </div>
             )}
