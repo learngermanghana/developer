@@ -10,7 +10,8 @@
     "clean": "rimraf lib",
     "serve": "firebase emulators:start --only functions",
     "deploy": "firebase deploy --only functions --project sedifex-dev",
-    "force-update-owner-email": "node scripts/forceUpdateOwnerEmailByUid.js"
+    "force-update-owner-email": "node scripts/forceUpdateOwnerEmailByUid.js",
+    "backfill-product-store-meta": "node scripts/backfillProductStoreMeta.js"
   },
   "dependencies": {
     "firebase-admin": "^13.6.0",
