@@ -40,6 +40,7 @@ const AUTH_VISUAL_IMAGE_URL =
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 const PASSWORD_MIN_LENGTH = 8
 const MAX_BLOG_POSTS = 3
+const LANDING_WHATSAPP_NUMBER = '0205706589'
 
 type AuthMode = 'login' | 'signup'
 type StatusTone = 'idle' | 'loading' | 'success' | 'error'
@@ -736,6 +737,7 @@ export default function AuthPage() {
   }
 
   const appStyle: React.CSSProperties = { minHeight: '100dvh' }
+  const landingSupportWhatsappLink = `https://wa.me/${LANDING_WHATSAPP_NUMBER}?text=${encodeURIComponent('Hello Sedifex team, I need help getting started.')}`
 
   return (
     <main className="app" style={appStyle}>
@@ -1395,6 +1397,15 @@ export default function AuthPage() {
           </ul>
         </article>
       </section>
+      <a
+        className="app-whatsapp-float"
+        href={landingSupportWhatsappLink}
+        target="_blank"
+        rel="noreferrer noopener"
+        aria-label={`Reach out on WhatsApp at ${LANDING_WHATSAPP_NUMBER}`}
+      >
+        WhatsApp us: {LANDING_WHATSAPP_NUMBER}
+      </a>
     </main>
   )
 }

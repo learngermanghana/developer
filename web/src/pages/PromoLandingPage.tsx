@@ -101,6 +101,7 @@ type CatalogApiResponse = {
 }
 
 const CATALOG_PAGE_SIZE = 24
+const CATALOG_DESCRIPTION_PREVIEW_LENGTH = 220
 
 function normalizeSlug(value: string): string {
   return value
@@ -172,8 +173,6 @@ function buildWhatsAppLink(phone: string | null, storeName: string): string | nu
   return `https://wa.me/${normalized}?text=${text}`
 }
 
-const LANDING_WHATSAPP_NUMBER = '0205706589'
-
 function getIntegrationEndpoint(path: string): string {
   const functionsRegion = import.meta.env.VITE_FB_FUNCTIONS_REGION ?? 'us-central1'
   const projectId = import.meta.env.VITE_FB_PROJECT_ID
@@ -203,6 +202,7 @@ export default function PromoLandingPage() {
   const [activeGalleryImageId, setActiveGalleryImageId] = useState<string | null>(null)
   const [catalogSearchTerm, setCatalogSearchTerm] = useState('')
   const [catalogPage, setCatalogPage] = useState(1)
+  const [expandedCatalogDescriptions, setExpandedCatalogDescriptions] = useState<Record<string, boolean>>({})
 
   const activeGalleryIndex = useMemo(() => {
     if (!activeGalleryImageId) {
@@ -241,6 +241,23 @@ export default function PromoLandingPage() {
     const start = (currentCatalogPage - 1) * CATALOG_PAGE_SIZE
     return filteredCatalogItems.slice(start, start + CATALOG_PAGE_SIZE)
   }, [currentCatalogPage, filteredCatalogItems])
+
+  function getCatalogDescriptionPreview(value: string): { text: string; isTruncated: boolean } {
+    const normalized = value.replace(/\s+/g, ' ').trim()
+    if (normalized.length <= CATALOG_DESCRIPTION_PREVIEW_LENGTH) {
+      return { text: normalized, isTruncated: false }
+    }
+    const clipped = normalized.slice(0, CATALOG_DESCRIPTION_PREVIEW_LENGTH)
+    const safeClip = clipped.replace(/\s+\S*$/, '').trim()
+    return { text: `${safeClip}…`, isTruncated: true }
+  }
+
+  function toggleCatalogDescription(itemId: string) {
+    setExpandedCatalogDescriptions(previous => ({
+      ...previous,
+      [itemId]: !previous[itemId],
+    }))
+  }
 
   useEffect(() => {
     let isMounted = true
@@ -541,7 +558,6 @@ export default function PromoLandingPage() {
   const promoSummary = sanitizeSummary(profile.summary, profile.storeName)
   const directChatLink = profile.storePhone ? `sms:${profile.storePhone}` : null
   const whatsappLink = buildWhatsAppLink(profile.storePhone, profile.storeName)
-  const landingSupportWhatsappLink = buildWhatsAppLink(LANDING_WHATSAPP_NUMBER, 'Sedifex team')
   const primaryPromoVideoEmbedUrl = profile.youtubeVideos[0]?.embedUrl ?? profile.youtubeEmbedUrl
   return (
     <main className="promo-page">
@@ -776,9 +792,29 @@ export default function PromoLandingPage() {
                     ) : null}
                     <div>
                       <strong>{item.name}</strong>
-                      <p className="promo-summary">
-                        {item.description || `${item.itemType === 'service' ? 'Service' : 'Product'} available`}
-                      </p>
+                      {item.description ? (
+                        <>
+                          <p className="promo-summary">
+                            {expandedCatalogDescriptions[item.id]
+                              ? item.description
+                              : getCatalogDescriptionPreview(item.description).text}
+                          </p>
+                          {getCatalogDescriptionPreview(item.description).isTruncated ? (
+                            <button
+                              type="button"
+                              className="promo-description-toggle"
+                              onClick={() => toggleCatalogDescription(item.id)}
+                              aria-expanded={Boolean(expandedCatalogDescriptions[item.id])}
+                            >
+                              {expandedCatalogDescriptions[item.id] ? 'View less' : 'View more'}
+                            </button>
+                          ) : null}
+                        </>
+                      ) : (
+                        <p className="promo-summary">
+                          {`${item.itemType === 'service' ? 'Service' : 'Product'} available`}
+                        </p>
+                      )}
                       <p className="promo-meta">
                         {item.category || 'General'} · {item.itemType === 'service' ? 'Service' : 'Product'}
                         {typeof item.price === 'number' ? ` · ${item.price.toFixed(2)}` : ''}
@@ -820,17 +856,6 @@ export default function PromoLandingPage() {
             ) : null}
         </section>
       </article>
-      {landingSupportWhatsappLink ? (
-        <a
-          className="promo-whatsapp-float"
-          href={landingSupportWhatsappLink}
-          target="_blank"
-          rel="noreferrer noopener"
-          aria-label={`Reach out on WhatsApp at ${LANDING_WHATSAPP_NUMBER}`}
-        >
-          WhatsApp us: {LANDING_WHATSAPP_NUMBER}
-        </a>
-      ) : null}
     </main>
   )
 }
