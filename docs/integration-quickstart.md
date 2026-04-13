@@ -344,7 +344,124 @@ export default async function MenuPage() {
 
 For promo + gallery integrations, use the same 30–120 second polling interval initially. If you later need sub-minute pushes, move to webhook-triggered cache invalidation.
 
-### 3) Top-selling products endpoint (new)
+### 3) Promo + gallery on Next.js (copy/paste reference)
+
+Teams usually struggle here for three reasons: missing auth header, incorrect endpoint (`/integrationPromo` instead of `/v1IntegrationPromo`), or fetching from a Client Component with a secret key.
+
+Use a **server-only helper** so your integration key never reaches the browser bundle:
+
+```ts
+// lib/sedifexPromo.ts
+import 'server-only'
+
+const BASE_URL = process.env.SEDIFEX_API_BASE_URL ?? 'https://us-central1-sedifex-web.cloudfunctions.net'
+const STORE_ID = process.env.SEDIFEX_STORE_ID ?? ''
+const API_KEY = process.env.SEDIFEX_INTEGRATION_API_KEY ?? process.env.SEDIFEX_INTEGRATION_KEY ?? ''
+const CONTRACT = process.env.SEDIFEX_CONTRACT_VERSION ?? '2026-04-13'
+
+type PromoPayload = {
+  storeId: string
+  promo: {
+    enabled: boolean
+    title?: string | null
+    summary?: string | null
+    startDate?: string | null
+    endDate?: string | null
+    websiteUrl?: string | null
+    imageUrl?: string | null
+    imageAlt?: string | null
+  }
+}
+
+type GalleryPayload = {
+  storeId: string
+  gallery: Array<{
+    id: string
+    url: string
+    alt?: string | null
+    caption?: string | null
+    sortOrder?: number
+    isPublished?: boolean
+  }>
+}
+
+export async function fetchPromoAndGallery() {
+  const headers = {
+    'x-api-key': API_KEY,
+    'X-Sedifex-Contract-Version': CONTRACT,
+    Accept: 'application/json',
+  }
+
+  const [promoRes, galleryRes] = await Promise.all([
+    fetch(`${BASE_URL}/v1IntegrationPromo?storeId=${encodeURIComponent(STORE_ID)}`, {
+      headers,
+      next: { revalidate: 60 },
+    }),
+    fetch(`${BASE_URL}/integrationGallery?storeId=${encodeURIComponent(STORE_ID)}`, {
+      headers,
+      next: { revalidate: 60 },
+    }),
+  ])
+
+  if (!promoRes.ok) throw new Error(`Promo request failed: ${promoRes.status}`)
+  if (!galleryRes.ok) throw new Error(`Gallery request failed: ${galleryRes.status}`)
+
+  const promoJson = (await promoRes.json()) as PromoPayload
+  const galleryJson = (await galleryRes.json()) as GalleryPayload
+
+  const publishedGallery = (galleryJson.gallery ?? [])
+    .filter(item => item?.isPublished !== false && item?.url)
+    .sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0))
+
+  return { promo: promoJson.promo, gallery: publishedGallery }
+}
+```
+
+Then render it in a Server Component page:
+
+```tsx
+// app/promo/page.tsx
+import { fetchPromoAndGallery } from '@/lib/sedifexPromo'
+
+export default async function PromoPage() {
+  const { promo, gallery } = await fetchPromoAndGallery()
+
+  return (
+    <main>
+      <h1>{promo?.title ?? 'Latest promo'}</h1>
+      {promo?.summary ? <p>{promo.summary}</p> : null}
+
+      {promo?.imageUrl ? <img src={promo.imageUrl} alt={promo.imageAlt ?? 'Promo image'} /> : null}
+
+      <section>
+        <h2>Gallery</h2>
+        {gallery.length ? (
+          <ul>
+            {gallery.map(item => (
+              <li key={item.id}>
+                <img src={item.url} alt={item.alt ?? 'Gallery image'} />
+                {item.caption ? <p>{item.caption}</p> : null}
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <p>No published gallery items yet.</p>
+        )}
+      </section>
+    </main>
+  )
+}
+```
+
+Quick troubleshooting checklist for promo/gallery:
+
+- Confirm endpoint names exactly: `v1IntegrationPromo` and `integrationGallery`.
+- Always send both headers: `x-api-key` and `X-Sedifex-Contract-Version`.
+- Validate `storeId` is not empty in your runtime env.
+- Keep integration key server-side only (no `NEXT_PUBLIC_` prefix).
+- Filter gallery on `isPublished !== false` and sort by `sortOrder`.
+
+### 4) Top-selling products endpoint (new)
 
 Use this endpoint when you want to render "best sellers" on your public website:
 
@@ -378,7 +495,7 @@ Response shape:
 }
 ```
 
-### 4) Optional live refresh with SWR
+### 5) Optional live refresh with SWR
 
 Use SWR on top of server-rendered data for near-live stock while preserving fast first paint.
 
