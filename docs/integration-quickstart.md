@@ -153,6 +153,15 @@ FAQ
   - No. These are project-level Cloud Functions params, set once per Firebase project/environment.
   - Each store still connects separately through OAuth, and each store gets its own stored connection record/token.
 
+
+## Sedifex Market / BuySedifex
+
+If you are integrating the dedicated Sedifex market frontend (`buysedifex` repo), follow the cross-repo communication plan in:
+
+- `docs/sedifex-buysedifex-integration-plan.md`
+
+It defines a pull + webhook model, contract versioning, reliability, and rollout sequencing so both repos can ship independently without API drift.
+
 ## Prerequisites
 
 1. Sedifex Firebase project configured (Firestore + Functions).
