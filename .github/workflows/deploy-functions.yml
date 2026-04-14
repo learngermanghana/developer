@@ -8,6 +8,7 @@ on:
       - 'functions/**'
       - 'firebase.json'
       - '.firebaserc'
+      - '.github/workflows/deploy-functions.yml'
 
 concurrency:
   group: firebase-functions-deploy
