@@ -3140,6 +3140,37 @@ function extractProductImageSet(data: Record<string, unknown>): { imageUrl: stri
   }
 }
 
+function toPublicProductPayload(
+  productId: string,
+  data: Record<string, unknown>,
+): Record<string, unknown> | null {
+  const storeId = toTrimmedStringOrNull(data.storeId)
+  const name = normalizeProductName(data.name)
+  if (!storeId || !name) return null
+
+  return {
+    sourceProductId: productId,
+    storeId,
+    name: name || 'Untitled item',
+    description:
+      typeof data.description === 'string' && data.description.trim() ? data.description.trim() : null,
+    category: typeof data.category === 'string' && data.category.trim() ? data.category.trim() : null,
+    price: typeof data.price === 'number' ? data.price : null,
+    stockCount: typeof data.stockCount === 'number' ? data.stockCount : null,
+    itemType:
+      data.itemType === 'service'
+        ? 'service'
+        : data.itemType === 'made_to_order'
+          ? 'made_to_order'
+          : 'product',
+    isPublished: data.isPublished !== false,
+    ...extractProductImageSet(data),
+    createdAt: data.createdAt ?? admin.firestore.FieldValue.serverTimestamp(),
+    sourceUpdatedAt: data.updatedAt ?? null,
+    updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+  }
+}
+
 async function resolvePromoStoreForRead(
   req: functions.https.Request,
   res: functions.Response<any>,
@@ -4004,7 +4035,7 @@ export const integrationPublicCatalog = functions.https.onRequest(async (req, re
   let productsSnapshot: admin.firestore.QuerySnapshot
   try {
     productsSnapshot = await db
-      .collection('products')
+      .collection('publicProducts')
       .where('storeId', '==', storeId)
       .orderBy('updatedAt', 'desc')
       .limit(200)
@@ -4016,7 +4047,7 @@ export const integrationPublicCatalog = functions.https.onRequest(async (req, re
       throw error
     }
 
-    productsSnapshot = await db.collection('products').where('storeId', '==', storeId).limit(200).get()
+    productsSnapshot = await db.collection('publicProducts').where('storeId', '==', storeId).limit(200).get()
   }
 
   const products = productsSnapshot.docs
@@ -4480,6 +4511,23 @@ export const enrichProductDataAfterSave = functions.firestore
     if (!updates.category && !updates.manufacturerName) return
 
     await change.after.ref.set(updates, { merge: true })
+  })
+
+export const syncProductToPublicProducts = functions.firestore
+  .document('products/{productId}')
+  .onWrite(async (change, context) => {
+    const productId = context.params.productId as string
+    const targetRef = db.collection('publicProducts').doc(productId)
+
+    if (!change.after.exists) {
+      await targetRef.delete().catch(() => undefined)
+      return
+    }
+
+    const payload = toPublicProductPayload(productId, (change.after.data() ?? {}) as Record<string, unknown>)
+    if (!payload) return
+
+    await targetRef.set(payload, { merge: true })
   })
 
 export const emitProductWebhooks = functions.firestore
