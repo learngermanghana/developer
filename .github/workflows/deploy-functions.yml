@@ -49,4 +49,4 @@ jobs:
           EOF
 
       - name: Deploy Firebase Functions
-        run: firebase deploy --only functions --project sedifex-web
+        run: firebase deploy --only functions --project sedifex-web --force
