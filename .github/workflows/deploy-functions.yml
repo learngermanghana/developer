@@ -8,7 +8,10 @@ on:
       - 'functions/**'
       - 'firebase.json'
       - '.firebaserc'
-      - '.github/workflows/deploy-functions.yml'
+
+concurrency:
+  group: firebase-functions-deploy
+  cancel-in-progress: true
 
 jobs:
   deploy:
@@ -22,10 +25,8 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 20
-
-      - name: Install root dependencies if needed
-        run: npm install
-        continue-on-error: true
+          cache: npm
+          cache-dependency-path: functions/package-lock.json
 
       - name: Install functions dependencies
         run: npm ci
@@ -40,5 +41,11 @@ jobs:
       - name: Set Google credentials
         run: echo "GOOGLE_APPLICATION_CREDENTIALS=$HOME/gcp-key.json" >> $GITHUB_ENV
 
-      - name: Deploy functions
+      - name: Write Functions env file
+        run: |
+          cat <<'EOF' > functions/.env.sedifex-web
+          ${{ secrets.FUNCTIONS_ENV_SEDIFEX_WEB }}
+          EOF
+
+      - name: Deploy Firebase Functions
         run: firebase deploy --only functions --project sedifex-web
