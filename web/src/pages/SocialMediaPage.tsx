@@ -156,6 +156,31 @@ function mapProduct(id: string, raw: Record<string, unknown>): ProductOption {
   }
 }
 
+function normalizeGeneratedPost(post: GenerateSocialPostResponse['post']): GenerateSocialPostResponse['post'] {
+  const normalizedCaption = post.caption.replace(/\r\n/g, '\n').trim()
+  const captionMatch = normalizedCaption.match(
+    /(?:^|\n)\s*caption\s*:\s*([\s\S]*?)(?=\n\s*(?:cta|hashtags|image prompt|design spec|selected image)\s*:|$)/i,
+  )
+  const hashtagsMatch = normalizedCaption.match(/(?:^|\n)\s*hashtags\s*:\s*([^\n]+)/i)
+
+  const cleanCaption = (captionMatch?.[1] ?? normalizedCaption).trim()
+  const parsedHashtags =
+    post.hashtags.length > 0
+      ? post.hashtags
+      : (hashtagsMatch?.[1] ?? '')
+          .split(/[,\s]+/)
+          .map(tag => tag.trim())
+          .filter(Boolean)
+          .map(tag => (tag.startsWith('#') ? tag : `#${tag}`))
+          .slice(0, 10)
+
+  return {
+    ...post,
+    caption: cleanCaption,
+    hashtags: parsedHashtags,
+  }
+}
+
 export default function SocialMediaPage() {
   const { storeId } = useActiveStore()
   const { publish } = useToast()
@@ -327,16 +352,17 @@ export default function SocialMediaPage() {
     const maxCaption: Record<ContentLength, number> = { short: 90, medium: 170, long: 220 }
     const hashtagLimit: Record<ContentLength, number> = { short: 5, medium: 7, long: 10 }
 
-    const cleanCaption = post.caption.trim()
+    const normalizedPost = normalizeGeneratedPost(post)
+    const cleanCaption = normalizedPost.caption.trim()
     const maxLen = maxCaption[lengthPreset]
     const trimmedCaption =
       cleanCaption.length > maxLen ? `${cleanCaption.slice(0, Math.max(maxLen - 1, 1)).trimEnd()}…` : cleanCaption
 
     return {
-      ...post,
+      ...normalizedPost,
       caption: `${tonePrefix[tone]}${trimmedCaption}`.trim(),
-      hashtags: post.hashtags.slice(0, hashtagLimit[lengthPreset]),
-      cta: tone === 'professional' ? post.cta.replace('!', '.').trim() : post.cta,
+      hashtags: normalizedPost.hashtags.slice(0, hashtagLimit[lengthPreset]),
+      cta: tone === 'professional' ? normalizedPost.cta.replace('!', '.').trim() : normalizedPost.cta,
     }
   }
 
@@ -622,6 +648,14 @@ export default function SocialMediaPage() {
             <p style={{ margin: 0 }}><strong>Hashtags:</strong> {result.post.hashtags.join(' ')}</p>
             {result.post.disclaimer ? <p style={{ margin: 0 }}><strong>Disclaimer:</strong> {result.post.disclaimer}</p> : null}
             <p style={{ margin: 0 }}><strong>Selected image:</strong> {result.product.imageUrl ? 'Ready to download and upload manually.' : 'No image URL on this item yet.'}</p>
+            {result.product.imageUrl ? (
+              <p style={{ margin: 0, fontSize: 13 }}>
+                <strong>Image URL:</strong>{' '}
+                <a href={result.product.imageUrl} target="_blank" rel="noopener noreferrer">
+                  Open original image
+                </a>
+              </p>
+            ) : null}
             <p style={{ margin: 0, fontSize: 13, opacity: 0.8 }}>Step 1: Download image. Step 2: Upload on Instagram/TikTok app. Step 3: Paste caption + hashtags.</p>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
               <button type="button" className="button secondary" onClick={() => void handleCopy('caption')}>Copy caption</button>
