@@ -526,6 +526,90 @@ body {
   color: #e0e7ff;
 }
 
+.app__promo-strategy {
+  width: min(1280px, 100%);
+  display: grid;
+  gap: clamp(18px, 4vw, 28px);
+  padding: clamp(22px, 5vw, 34px);
+  border-radius: 28px;
+  background: linear-gradient(145deg, rgba(15, 23, 42, 0.92), rgba(17, 24, 39, 0.85));
+  border: 1px solid rgba(148, 163, 184, 0.24);
+  box-shadow: 0 26px 66px -38px rgba(15, 23, 42, 0.9);
+}
+
+.app__promo-strategy-header {
+  display: grid;
+  gap: 12px;
+  max-width: 860px;
+}
+
+.app__promo-strategy-header h2 {
+  margin: 0;
+  font-size: clamp(22px, 4vw, 34px);
+  letter-spacing: -0.01em;
+}
+
+.app__promo-strategy-header p {
+  margin: 0;
+  color: var(--color-text-secondary);
+  line-height: 1.6;
+}
+
+.promo-map {
+  display: grid;
+  gap: 12px;
+  align-items: center;
+}
+
+.promo-map__source,
+.promo-map__target {
+  border-radius: 18px;
+  border: 1px solid rgba(148, 163, 184, 0.28);
+  padding: 14px 16px;
+  text-align: center;
+  font-weight: 600;
+}
+
+.promo-map__source {
+  background: linear-gradient(135deg, rgba(59, 130, 246, 0.4), rgba(14, 116, 144, 0.32));
+  color: #dbeafe;
+}
+
+.promo-map__target {
+  position: relative;
+  background: rgba(15, 23, 42, 0.66);
+  color: var(--color-text-secondary);
+}
+
+.promo-map__target::before {
+  content: '↘';
+  position: absolute;
+  top: -16px;
+  left: 50%;
+  transform: translateX(-50%);
+  color: rgba(191, 219, 254, 0.8);
+  font-size: 15px;
+}
+
+.app__promo-pillars {
+  display: grid;
+  gap: 12px;
+}
+
+.app__promo-pillars h3 {
+  margin: 0;
+  font-size: clamp(18px, 3vw, 24px);
+}
+
+.app__promo-pillars ul {
+  margin: 0;
+  padding-left: 20px;
+  display: grid;
+  gap: 8px;
+  color: var(--color-text-secondary);
+  line-height: 1.6;
+}
+
 .app__features {
   width: min(1280px, 100%);
   display: grid;
@@ -777,6 +861,15 @@ body {
     grid-template-columns: minmax(0, 520px) minmax(0, 1fr);
     align-items: center;
     gap: clamp(32px, 6vw, 72px);
+  }
+
+  .app__promo-strategy {
+    grid-template-columns: minmax(0, 1fr) minmax(320px, 440px);
+    align-items: start;
+  }
+
+  .app__promo-strategy-header {
+    grid-column: 1 / -1;
   }
 
   .app__features {
