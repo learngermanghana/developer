@@ -1219,10 +1219,12 @@ export default function AuthPage() {
       <section className="app__promo-strategy" aria-label="Sedifex promo strategy">
         <header className="app__promo-strategy-header">
           <span className="app__pill">Sedifex Promo Strategy</span>
-          <h2>One product post. Every channel updated at the same time.</h2>
+          <h2>Post once in Sedifex. Publish everywhere instantly.</h2>
           <p>
-            Add your products once in Sedifex, sell with POS, and publish the same offer
-            across Sedifex Market, Google Merchant, your website, and social media.
+            Every channel stays in sync from one update, so your stock, pricing, and messaging remain consistent everywhere customers discover your store.
+          </p>
+          <p>
+            One post can appear on Google Merchant, <a href="https://www.sedifexmarket.com" target="_blank" rel="noreferrer">www.sedifexmarket.com</a>, your website, and social pages for stronger Google presence. If your store already sells on Jumia or uses a Hubtel seller account, you can also connect those channels through Sedifex.
           </p>
         </header>
 
@@ -1233,6 +1235,12 @@ export default function AuthPage() {
           <div className="promo-map__target">Website</div>
           <div className="promo-map__target">Social Channels</div>
         </div>
+        <p>
+          Example flow: <strong>Add Product</strong> → <strong>AI generates caption</strong> → <strong>Publish to channels</strong> → <strong>Send branded SMS</strong>.
+        </p>
+        <p>
+          Trust signal: merchants can verify the same product listing across connected channels within minutes.
+        </p>
 
         <div className="app__promo-pillars">
           <h3>Promo pillars</h3>
@@ -1365,7 +1373,7 @@ const PRICING_PLANS = [
       'Up to 10 sales per day',
       'Buy SMS credits anytime (separate from plan)',
       'Customer display and QR pricing',
-      'Products can publish to buy.sedifex.com',
+      'Products can publish to www.sedifex.com',
     ],
     cta: {
       type: 'button' as const,

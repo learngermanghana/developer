@@ -43,6 +43,8 @@ type StoreContactDetails = {
   email: string | null
   website: string | null
 }
+const PRODUCT_PAGE_SIZE = 20
+const HISTORY_LIMIT = 5
 
 function cleanRichText(value: string): string {
   return value
@@ -195,6 +197,7 @@ export default function SocialMediaPage() {
   const [productLoadError, setProductLoadError] = useState<string | null>(null)
   const [history, setHistory] = useState<SocialHistoryEntry[]>([])
   const [productSearchTerm, setProductSearchTerm] = useState('')
+  const [productPage, setProductPage] = useState(1)
   const [storeContact, setStoreContact] = useState<StoreContactDetails>({
     phone: null,
     email: null,
@@ -244,7 +247,7 @@ export default function SocialMediaPage() {
         return
       }
       const parsed = JSON.parse(raw) as SocialHistoryEntry[]
-      setHistory(Array.isArray(parsed) ? parsed.slice(0, 8) : [])
+      setHistory(Array.isArray(parsed) ? parsed.slice(0, HISTORY_LIMIT) : [])
     } catch (_error) {
       setHistory([])
     }
@@ -323,12 +326,30 @@ export default function SocialMediaPage() {
   }, [productSearchTerm, products])
 
   useEffect(() => {
-    if (!filteredProducts.length) {
+    setProductPage(1)
+  }, [productSearchTerm])
+
+  const totalProductPages = useMemo(
+    () => Math.max(1, Math.ceil(filteredProducts.length / PRODUCT_PAGE_SIZE)),
+    [filteredProducts.length, PRODUCT_PAGE_SIZE],
+  )
+
+  useEffect(() => {
+    setProductPage(current => Math.min(Math.max(current, 1), totalProductPages))
+  }, [totalProductPages])
+
+  const paginatedProducts = useMemo(() => {
+    const startIndex = (productPage - 1) * PRODUCT_PAGE_SIZE
+    return filteredProducts.slice(startIndex, startIndex + PRODUCT_PAGE_SIZE)
+  }, [filteredProducts, productPage, PRODUCT_PAGE_SIZE])
+
+  useEffect(() => {
+    if (!paginatedProducts.length) {
       setSelectedId('')
       return
     }
-    setSelectedId(current => (current && filteredProducts.some(product => product.id === current) ? current : filteredProducts[0].id))
-  }, [filteredProducts])
+    setSelectedId(current => (current && paginatedProducts.some(product => product.id === current) ? current : paginatedProducts[0].id))
+  }, [paginatedProducts])
 
   const selectedPreview = useMemo(() => {
     if (!selectedProduct) return null
@@ -376,7 +397,7 @@ export default function SocialMediaPage() {
       productName: nextResult.product.name,
       post: nextResult.post,
     }
-    const nextHistory = [nextEntry, ...history].slice(0, 8)
+    const nextHistory = [nextEntry, ...history].slice(0, HISTORY_LIMIT)
     setHistory(nextHistory)
     try {
       window.localStorage.setItem(`social-history-${storeId}`, JSON.stringify(nextHistory))
@@ -563,9 +584,9 @@ export default function SocialMediaPage() {
 
         <label style={{ display: 'grid', gap: 6 }}>
           <span id="social-product-label">Product or service</span>
-          <select aria-labelledby="social-product-label" value={selectedId} onChange={event => setSelectedId(event.target.value)} disabled={!filteredProducts.length}>
-            {filteredProducts.length ? (
-              filteredProducts.map(product => (
+          <select aria-labelledby="social-product-label" value={selectedId} onChange={event => setSelectedId(event.target.value)} disabled={!paginatedProducts.length}>
+            {paginatedProducts.length ? (
+              paginatedProducts.map(product => (
                 <option key={product.id} value={product.id}>
                   {product.name} {product.itemType === 'service' ? '(service)' : ''}
                 </option>
@@ -575,6 +596,29 @@ export default function SocialMediaPage() {
             )}
           </select>
         </label>
+        {filteredProducts.length > PRODUCT_PAGE_SIZE ? (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+            <button
+              type="button"
+              className="button secondary"
+              onClick={() => setProductPage(current => Math.max(1, current - 1))}
+              disabled={productPage <= 1}
+            >
+              Previous
+            </button>
+            <span style={{ fontSize: 13, opacity: 0.85 }}>
+              Page {productPage} of {totalProductPages} · {filteredProducts.length} results
+            </span>
+            <button
+              type="button"
+              className="button secondary"
+              onClick={() => setProductPage(current => Math.min(totalProductPages, current + 1))}
+              disabled={productPage >= totalProductPages}
+            >
+              Next
+            </button>
+          </div>
+        ) : null}
         {productLoadError ? <p style={{ margin: 0, color: 'var(--danger, #c62828)' }}>{productLoadError}</p> : null}
 
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 8 }}>
@@ -667,41 +711,6 @@ export default function SocialMediaPage() {
           </div>
         ) : null}
 
-        {history.length ? (
-          <div style={{ display: 'grid', gap: 8 }}>
-            <strong>Recent generations</strong>
-            {history.map(entry => (
-              <button
-                key={entry.id}
-                type="button"
-                className="button secondary"
-                style={{ textAlign: 'left' }}
-                onClick={() =>
-                  setResult(current =>
-                    current
-                      ? { ...current, productId: entry.productId, product: { ...current.product, name: entry.productName }, post: entry.post }
-                      : {
-                          storeId: storeId || '',
-                          productId: entry.productId,
-                          product: {
-                            id: entry.productId ?? undefined,
-                            name: entry.productName,
-                            category: null,
-                            description: null,
-                            price: null,
-                            imageUrl: null,
-                            itemType: 'product',
-                          },
-                          post: entry.post,
-                        },
-                  )
-                }
-              >
-                {new Date(entry.createdAtIso).toLocaleString()} · {entry.platform} · {entry.productName}
-              </button>
-            ))}
-          </div>
-        ) : null}
       </div>
     </PageSection>
   )
