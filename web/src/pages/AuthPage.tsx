@@ -33,8 +33,6 @@ import { auth, db } from '../firebase'
 import { setOnboardingStatus } from '../utils/onboarding'
 import { normalizeGhanaPhoneE164 } from '../utils/phone'
 
-const LOGI_PARTNER_IMAGE_URL =
-  'https://raw.githubusercontent.com/learngermanghana/sedifexbiz/main/photos/pexels-omotayo-tajudeen-1650120-3213283%281%29.jpg'
 const AUTH_VISUAL_IMAGE_URL =
   'https://raw.githubusercontent.com/learngermanghana/sedifexbiz/main/photos/pexels-olly-3801439.jpg'
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
@@ -1218,101 +1216,47 @@ export default function AuthPage() {
         )}
       </section>
 
-      <section className="app__partners" aria-label="Xenom IT Solutions offerings">
-        <div className="app__partners-copy">
-          <span className="app__pill">Xenom IT Solutions</span>
-          <h2>Sedifex was built by Xenom IT Solutions</h2>
+      <section className="app__promo-strategy" aria-label="Sedifex promo strategy">
+        <header className="app__promo-strategy-header">
+          <span className="app__pill">Sedifex Promo Strategy</span>
+          <h2>One product post. Every channel updated at the same time.</h2>
           <p>
-            We build reliable digital products for ambitious businesses. In addition to
-            Sedifex, we deliver ready-to-use platforms and custom web builds that help
-            teams launch fast and scale with confidence.
-          </p>
-
-          <div className="app__partners-examples">
-            <p className="app__partners-examples-label">Other products we have built:</p>
-            <ul className="app__partners-list">
-              <li className="app__partners-badge">
-                <span className="app__partners-name">Falowen German Learning App</span>
-              </li>
-              <li className="app__partners-badge">
-                <span className="app__partners-name">Apzla Church Management Software</span>
-              </li>
-              <li className="app__partners-badge">
-                <span className="app__partners-name">Sedifex</span>
-              </li>
-            </ul>
-          </div>
-
-          <div className="app__partners-examples">
-            <p className="app__partners-examples-label">Send bulk SMS to clients</p>
-            <ul className="app__partners-list">
-              <li className="app__partners-badge">
-                <span className="app__partners-name">Starter — ₵50</span>
-                <span className="app__partners-location">
-                  10,000 credits · ~833 SMS
-                </span>
-              </li>
-              <li className="app__partners-badge">
-                <span className="app__partners-name">Growth — ₵230</span>
-                <span className="app__partners-location">
-                  50,000 credits · ~4,166 SMS
-                </span>
-              </li>
-              <li className="app__partners-badge">
-                <span className="app__partners-name">Scale — ₵430</span>
-                <span className="app__partners-location">
-                  100,000 credits · ~8,333 SMS
-                </span>
-              </li>
-            </ul>
-            <p className="app__partners-location">
-              Free invoice and receipt generator. Link your Sedifex account to Excel for
-              easy data transfers.
-            </p>
-          </div>
-
-          <a className="app__partners-link" href="mailto:info@sedifex.com">
-            Book a Sedifex demo: info@sedifex.com
-          </a>
-        </div>
-
-        <div className="app__partners-visual" aria-hidden="true">
-          <img
-            src={LOGI_PARTNER_IMAGE_URL}
-            alt="Retail partners reviewing a product shelf"
-            loading="lazy"
-          />
-          <div className="app__partners-glow" />
-        </div>
-      </section>
-
-      <section className="app__features" aria-label="Sedifex workspace pages">
-        <header className="app__features-header">
-          <h2>Explore the AI workspace</h2>
-          <p>
-            Every Sedifex page is built to keep retail operations synchronized with
-            AI-powered inventory insights—from the sales floor to finance.
+            Add your products once in Sedifex, sell with POS, and publish the same offer
+            across Sedifex Market, Google Merchant, your website, and social media.
           </p>
         </header>
 
-        <div className="app__features-grid" role="list">
-          {PAGE_FEATURES.map(feature => (
-            <Link
-              key={feature.path}
-              className="feature-card"
-              to={feature.path}
-              role="listitem"
-              aria-label={`Open the ${feature.name} page`}
-            >
-              <div className="feature-card__body">
-                <h3>{feature.name}</h3>
-                <p>{feature.description}</p>
-              </div>
-              <span className="feature-card__cta" aria-hidden="true">
-                Visit {feature.name}
-              </span>
-            </Link>
-          ))}
+        <div className="promo-map" role="img" aria-label="Sedifex post distribution map">
+          <div className="promo-map__source">Sedifex Inventory + POS</div>
+          <div className="promo-map__target">Sedifex Market</div>
+          <div className="promo-map__target">Google Merchant</div>
+          <div className="promo-map__target">Website</div>
+          <div className="promo-map__target">Social Channels</div>
+        </div>
+
+        <div className="app__promo-pillars">
+          <h3>Promo pillars</h3>
+          <ul>
+            <li>
+              <strong>One-post distribution:</strong> one update in Sedifex pushes your
+              product story to every channel.
+            </li>
+            <li>
+              <strong>POS + inventory sync:</strong> sales, prices, and stock stay aligned
+              while campaigns are live.
+            </li>
+            <li>
+              <strong>AI content engine:</strong> generate branded social captions directly
+              from your own inventory data.
+            </li>
+            <li>
+              <strong>Branded SMS outreach:</strong> send company-branded bulk SMS offers to
+              your customer lists in minutes.
+            </li>
+          </ul>
+          <a className="app__partners-link" href="mailto:info@sedifex.com">
+            Book a Sedifex promo demo: info@sedifex.com
+          </a>
         </div>
       </section>
 
@@ -1409,39 +1353,6 @@ export default function AuthPage() {
     </main>
   )
 }
-
-const PAGE_FEATURES = [
-  {
-    path: '/products',
-    name: 'Items',
-    description:
-      'Spot low inventory, sync counts, and keep every SKU accurate across locations.',
-  },
-  {
-    path: '/sell',
-    name: 'Sell',
-    description:
-      'Ring up sales with guided workflows that keep the floor moving and customers happy.',
-  },
-  {
-    path: '/customers',
-    name: 'Customers',
-    description:
-      'Understand top shoppers, loyalty trends, and service follow-ups without exporting data.',
-  },
-  {
-    path: '/finance',
-    name: 'Finance',
-    description:
-      'Track cash-up, expenses, and profitability with one simple view.',
-  },
-  {
-    path: '/logi',
-    name: 'Logi partners',
-    description:
-      'Share a live public snapshot of your store name, location, and overview with partners.',
-  },
-] as const
 
 const PRICING_PLANS = [
   {
