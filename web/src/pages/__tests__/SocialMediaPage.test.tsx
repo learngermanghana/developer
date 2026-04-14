@@ -138,4 +138,40 @@ describe('SocialMediaPage manual flow', () => {
       expect(screen.getByRole('button', { name: /download image/i })).toBeDisabled()
     })
   })
+
+  it('normalizes mixed draft text so only caption and hashtags are shown', async () => {
+    const user = userEvent.setup()
+    mockRequestSocialPost.mockResolvedValueOnce({
+      storeId: 'store-1',
+      productId: 'product-1',
+      product: {
+        id: 'product-1',
+        name: 'Zobo Mix',
+        category: 'Drinks',
+        description: 'Fresh and ready',
+        price: 15,
+        imageUrl: 'https://example.com/image.jpg',
+        itemType: 'product',
+      },
+      post: {
+        platform: 'instagram',
+        caption:
+          'Caption: Transform your skincare routine with our Anti Pimples Face Soap Big!\nCTA: Order now.\nHashtags: #AntiPimples #ClearSkin',
+        cta: 'Order now!',
+        hashtags: [],
+        imagePrompt: 'ignored',
+        designSpec: { aspectRatio: '1:1', safeTextZones: ['10% top'], visualStyle: 'bright' },
+        disclaimer: null,
+      },
+    })
+    render(<SocialMediaPage />)
+
+    await user.click(screen.getByRole('button', { name: /generate social post/i }))
+
+    expect(await screen.findByText(/Caption:/i)).toHaveTextContent(
+      'Caption: Transform your skincare routine with our Anti Pimples Face Soap Big!',
+    )
+    expect(screen.getByText(/Hashtags:/i)).toHaveTextContent('Hashtags: #AntiPimples #ClearSkin')
+    expect(screen.getByRole('button', { name: /download image/i })).toBeEnabled()
+  })
 })
