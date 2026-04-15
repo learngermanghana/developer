@@ -4420,8 +4420,12 @@ function computeWebhookSignature(secret: string, payload: string) {
 type ProductEnrichment = {
   category: string | null
   manufacturerName: string | null
+  description: string | null
+  imageAlt: string | null
   confidence: 'high' | 'medium' | 'low'
   reason: string
+  categoryMethod: 'embedding' | 'rule'
+  qualityFlags: string[]
 }
 
 const PRODUCT_CATEGORY_RULES: Array<{ category: string; keywords: string[] }> = [
@@ -4439,6 +4443,15 @@ const MANUFACTURER_RULES: Array<{ manufacturerName: string; keywords: string[] }
   { manufacturerName: 'Nestlé', keywords: ['nestle', 'milo', 'nescafe'] },
   { manufacturerName: 'Unilever', keywords: ['lux', 'closeup', 'omo', 'sunlight'] },
   { manufacturerName: 'PZ Cussons', keywords: ['morning fresh', 'cussons', 'imperial leather'] },
+]
+
+const CATEGORY_EMBEDDING_VOCAB: Array<{ category: string; keywords: string[] }> = [
+  { category: 'Beverages', keywords: ['drink', 'juice', 'soda', 'water', 'coffee', 'tea', 'energy'] },
+  { category: 'Snacks', keywords: ['chips', 'biscuit', 'cookie', 'cracker', 'chocolate', 'nuts'] },
+  { category: 'Dairy', keywords: ['milk', 'cheese', 'yoghurt', 'yogurt', 'butter', 'cream'] },
+  { category: 'Bakery', keywords: ['bread', 'cake', 'muffin', 'croissant', 'donut', 'pastry'] },
+  { category: 'Personal Care', keywords: ['soap', 'shampoo', 'toothpaste', 'lotion', 'deodorant'] },
+  { category: 'Cleaning', keywords: ['detergent', 'bleach', 'cleaner', 'disinfectant', 'sanitizer'] },
 ]
 
 function normalizeRuleText(value: unknown): string {
@@ -4463,6 +4476,87 @@ function inferManufacturerFromText(productText: string): string | null {
   return null
 }
 
+function tokenizeForEmbedding(value: string): string[] {
+  if (!value) return []
+  return value
+    .replace(/[^a-z0-9\s]/gi, ' ')
+    .split(/\s+/)
+    .map(token => token.trim().toLowerCase())
+    .filter(token => token.length > 1)
+}
+
+function buildFrequencyMap(tokens: string[]): Map<string, number> {
+  const map = new Map<string, number>()
+  for (const token of tokens) {
+    map.set(token, (map.get(token) ?? 0) + 1)
+  }
+  return map
+}
+
+function cosineSimilarity(a: Map<string, number>, b: Map<string, number>): number {
+  let dot = 0
+  let magA = 0
+  let magB = 0
+
+  for (const value of a.values()) {
+    magA += value * value
+  }
+  for (const value of b.values()) {
+    magB += value * value
+  }
+  if (!magA || !magB) return 0
+
+  for (const [token, aValue] of a.entries()) {
+    const bValue = b.get(token) ?? 0
+    dot += aValue * bValue
+  }
+
+  return dot / (Math.sqrt(magA) * Math.sqrt(magB))
+}
+
+function inferCategoryByEmbedding(productText: string): { category: string; score: number } | null {
+  const productVector = buildFrequencyMap(tokenizeForEmbedding(productText))
+  if (!productVector.size) return null
+
+  let best: { category: string; score: number } | null = null
+  for (const row of CATEGORY_EMBEDDING_VOCAB) {
+    const categoryVector = buildFrequencyMap(row.keywords.flatMap(keyword => tokenizeForEmbedding(keyword)))
+    const score = cosineSimilarity(productVector, categoryVector)
+    if (!best || score > best.score) {
+      best = { category: row.category, score }
+    }
+  }
+
+  if (!best || best.score < 0.2) return null
+  return best
+}
+
+function summarizeDescription(name: string, category: string | null, manufacturer: string | null): string | null {
+  const safeName = name.trim()
+  if (!safeName) return null
+  const parts = [`${safeName} is a quality item`]
+  if (category) {
+    parts.push(`in the ${category} category`)
+  }
+  if (manufacturer) {
+    parts.push(`from ${manufacturer}`)
+  }
+  return `${parts.join(' ')}.`
+}
+
+function synthesizeImageAlt(name: string, category: string | null): string | null {
+  const safeName = name.trim()
+  if (!safeName) return null
+  if (category) return `${safeName} (${category}) product image`
+  return `${safeName} product image`
+}
+
+function isLowQualityText(value: string): boolean {
+  const normalized = value.trim().toLowerCase()
+  if (!normalized) return true
+  return normalized.length < 8 || /^(n\/a|na|none|test|item|product)$/.test(normalized)
+}
+
 function buildProductEnrichment(data: Record<string, unknown>): ProductEnrichment | null {
   const name = normalizeRuleText(data.name)
   if (!name) return null
@@ -4470,20 +4564,136 @@ function buildProductEnrichment(data: Record<string, unknown>): ProductEnrichmen
   const description = normalizeRuleText(data.description)
   const existingCategory = normalizeRuleText(data.category)
   const existingManufacturer = normalizeRuleText(data.manufacturerName)
+  const existingImageAlt = normalizeRuleText(data.imageAlt)
   const merged = `${name} ${description}`.trim()
 
-  const inferredCategory = existingCategory ? null : inferCategoryFromText(merged)
+  const inferredByEmbedding = existingCategory ? null : inferCategoryByEmbedding(merged)
+  const inferredCategory = existingCategory
+    ? null
+    : inferredByEmbedding?.category ?? inferCategoryFromText(merged)
   const inferredManufacturer = existingManufacturer ? null : inferManufacturerFromText(merged)
+  const shouldImproveDescription = isLowQualityText(description)
+  const shouldImproveImageAlt = isLowQualityText(existingImageAlt)
+  const inferredDescription = shouldImproveDescription
+    ? summarizeDescription(
+        normalizeProductName(data.name),
+        inferredCategory ?? (typeof data.category === 'string' ? data.category.trim() : null),
+        inferredManufacturer ?? (typeof data.manufacturerName === 'string' ? data.manufacturerName.trim() : null),
+      )
+    : null
+  const inferredImageAlt = shouldImproveImageAlt
+    ? synthesizeImageAlt(
+        normalizeProductName(data.name),
+        inferredCategory ?? (typeof data.category === 'string' ? data.category.trim() : null),
+      )
+    : null
 
-  if (!inferredCategory && !inferredManufacturer) return null
+  const qualityFlags: string[] = []
+  if (shouldImproveDescription) qualityFlags.push('missing-or-low-quality-description')
+  if (shouldImproveImageAlt) qualityFlags.push('missing-or-low-quality-image-alt')
+  if (!existingCategory && !inferredCategory) qualityFlags.push('missing-category')
 
-  const matchCount = Number(Boolean(inferredCategory)) + Number(Boolean(inferredManufacturer))
+  if (!inferredCategory && !inferredManufacturer && !inferredDescription && !inferredImageAlt && !qualityFlags.length)
+    return null
+
+  const matchCount =
+    Number(Boolean(inferredCategory)) +
+    Number(Boolean(inferredManufacturer)) +
+    Number(Boolean(inferredDescription)) +
+    Number(Boolean(inferredImageAlt))
   return {
     category: inferredCategory,
     manufacturerName: inferredManufacturer,
-    confidence: matchCount === 2 ? 'high' : 'medium',
-    reason: 'rule-based keyword enrichment',
+    description: inferredDescription,
+    imageAlt: inferredImageAlt,
+    confidence: matchCount >= 3 ? 'high' : matchCount >= 2 ? 'medium' : 'low',
+    reason: inferredByEmbedding ? 'embedding + rule hybrid enrichment' : 'rule-based keyword enrichment',
+    categoryMethod: inferredByEmbedding ? 'embedding' : 'rule',
+    qualityFlags,
   }
+}
+
+function normalizeForDuplicateMatch(value: unknown): string {
+  if (typeof value !== 'string') return ''
+  return value.toLowerCase().replace(/[^a-z0-9]+/g, '').trim()
+}
+
+function levenshteinDistance(a: string, b: string): number {
+  if (a === b) return 0
+  if (!a) return b.length
+  if (!b) return a.length
+
+  const prev = Array.from({ length: b.length + 1 }, (_, index) => index)
+  const curr = Array.from({ length: b.length + 1 }, () => 0)
+
+  for (let i = 1; i <= a.length; i++) {
+    curr[0] = i
+    for (let j = 1; j <= b.length; j++) {
+      const cost = a[i - 1] === b[j - 1] ? 0 : 1
+      curr[j] = Math.min(
+        prev[j] + 1,
+        curr[j - 1] + 1,
+        prev[j - 1] + cost,
+      )
+    }
+    for (let j = 0; j <= b.length; j++) {
+      prev[j] = curr[j]
+    }
+  }
+  return prev[b.length]
+}
+
+function fuzzySimilarity(a: string, b: string): number {
+  const distance = levenshteinDistance(a, b)
+  const maxLength = Math.max(a.length, b.length)
+  if (!maxLength) return 1
+  return 1 - distance / maxLength
+}
+
+function buildImageHash(value: unknown): string | null {
+  if (typeof value !== 'string') return null
+  const normalized = value.trim().toLowerCase()
+  if (!normalized) return null
+  return crypto.createHash('sha1').update(normalized).digest('hex').slice(0, 16)
+}
+
+async function detectPotentialDuplicateProduct(params: {
+  productId: string
+  storeId: string
+  name: string
+  imageUrl: string | null
+}): Promise<{ duplicateProductId: string; similarity: number; imageHashMatch: boolean } | null> {
+  const normalizedName = normalizeForDuplicateMatch(params.name)
+  if (!normalizedName || !params.storeId) return null
+
+  const currentImageHash = buildImageHash(params.imageUrl)
+  const snapshot = await db
+    .collection('products')
+    .where('storeId', '==', params.storeId)
+    .limit(200)
+    .get()
+
+  let bestMatch: { duplicateProductId: string; similarity: number; imageHashMatch: boolean } | null = null
+  for (const doc of snapshot.docs) {
+    if (doc.id === params.productId) continue
+    const data = (doc.data() ?? {}) as Record<string, unknown>
+    const candidateName = normalizeForDuplicateMatch(data.name)
+    if (!candidateName) continue
+    const similarity = fuzzySimilarity(normalizedName, candidateName)
+    const candidateImageHash = buildImageHash(data.imageUrl)
+    const imageHashMatch = Boolean(currentImageHash && candidateImageHash && currentImageHash === candidateImageHash)
+    const isLikelyDuplicate = similarity >= 0.91 || (similarity >= 0.8 && imageHashMatch)
+    if (!isLikelyDuplicate) continue
+
+    if (!bestMatch || similarity > bestMatch.similarity) {
+      bestMatch = {
+        duplicateProductId: doc.id,
+        similarity,
+        imageHashMatch,
+      }
+    }
+  }
+  return bestMatch
 }
 
 function isFirestoreTimestampLike(value: unknown): boolean {
@@ -4598,24 +4808,70 @@ export const enrichProductDataAfterSave = functions.firestore
   .onWrite(async (change, context) => {
     if (!change.after.exists) return
 
+    const productId = context.params.productId
     const afterData = (change.after.data() ?? {}) as Record<string, unknown>
     const enrichment = buildProductEnrichment(afterData)
-    if (!enrichment) return
+    const storeId = typeof afterData.storeId === 'string' ? afterData.storeId.trim() : ''
+    const duplicateCandidate =
+      typeof afterData.name === 'string' && storeId
+        ? await detectPotentialDuplicateProduct({
+            productId,
+            storeId,
+            name: afterData.name,
+            imageUrl: typeof afterData.imageUrl === 'string' ? afterData.imageUrl : null,
+          })
+        : null
+    if (!enrichment && !duplicateCandidate) return
 
     const updates: Record<string, unknown> = {
       updatedAt: admin.firestore.FieldValue.serverTimestamp(),
       enrichmentMeta: {
         source: 'product-enrichment-agent',
         lastRunAt: admin.firestore.FieldValue.serverTimestamp(),
-        confidence: enrichment.confidence,
-        reason: enrichment.reason,
+        confidence: enrichment?.confidence ?? 'low',
+        reason: enrichment?.reason ?? 'duplicate-detection-only',
+        categoryMethod: enrichment?.categoryMethod ?? null,
+        qualityFlags: enrichment?.qualityFlags ?? [],
         eventId: context.eventId,
       },
     }
 
-    if (enrichment.category) updates.category = enrichment.category
-    if (enrichment.manufacturerName) updates.manufacturerName = enrichment.manufacturerName
-    if (!updates.category && !updates.manufacturerName) return
+    if (enrichment?.category) updates.category = enrichment.category
+    if (enrichment?.manufacturerName) updates.manufacturerName = enrichment.manufacturerName
+    if (enrichment?.description) updates.description = enrichment.description
+    if (enrichment?.imageAlt) updates.imageAlt = enrichment.imageAlt
+    if (duplicateCandidate) {
+      updates.catalogQuality = {
+        duplicateRisk: 'high',
+        duplicateProductId: duplicateCandidate.duplicateProductId,
+        duplicateSimilarity: Number(duplicateCandidate.similarity.toFixed(4)),
+        imageHashMatch: duplicateCandidate.imageHashMatch,
+        checkedAt: admin.firestore.FieldValue.serverTimestamp(),
+      }
+    } else {
+      updates.catalogQuality = {
+        duplicateRisk: 'low',
+        checkedAt: admin.firestore.FieldValue.serverTimestamp(),
+      }
+    }
+
+    const currentCategory = typeof afterData.category === 'string' ? afterData.category.trim() : null
+    const currentManufacturer = typeof afterData.manufacturerName === 'string' ? afterData.manufacturerName.trim() : null
+    const currentDescription = typeof afterData.description === 'string' ? afterData.description.trim() : null
+    const currentImageAlt = typeof afterData.imageAlt === 'string' ? afterData.imageAlt.trim() : null
+    const currentDuplicateProductId =
+      afterData.catalogQuality && typeof afterData.catalogQuality === 'object'
+        ? toTrimmedStringOrNull((afterData.catalogQuality as Record<string, unknown>).duplicateProductId)
+        : null
+    const nextDuplicateProductId = duplicateCandidate?.duplicateProductId ?? null
+
+    const shouldWrite =
+      currentCategory !== (typeof updates.category === 'string' ? updates.category : currentCategory) ||
+      currentManufacturer !== (typeof updates.manufacturerName === 'string' ? updates.manufacturerName : currentManufacturer) ||
+      currentDescription !== (typeof updates.description === 'string' ? updates.description : currentDescription) ||
+      currentImageAlt !== (typeof updates.imageAlt === 'string' ? updates.imageAlt : currentImageAlt) ||
+      currentDuplicateProductId !== nextDuplicateProductId
+    if (!shouldWrite) return
 
     await change.after.ref.set(updates, { merge: true })
   })
