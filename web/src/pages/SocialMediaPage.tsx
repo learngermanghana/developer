@@ -188,6 +188,48 @@ function normalizeGeneratedPost(post: GenerateSocialPostResponse['post']): Gener
   }
 }
 
+async function copyTextToClipboard(text: string): Promise<boolean> {
+  try {
+    if (navigator.clipboard && typeof navigator.clipboard.writeText === 'function') {
+      await navigator.clipboard.writeText(text)
+      return true
+    }
+  } catch (_error) {
+    // fall back to document.execCommand for browsers with partial clipboard support (notably some iOS/Safari flows)
+  }
+
+  const textarea = document.createElement('textarea')
+  textarea.value = text
+  textarea.setAttribute('readonly', 'true')
+  textarea.style.position = 'fixed'
+  textarea.style.opacity = '0'
+  textarea.style.left = '-9999px'
+  textarea.style.top = '0'
+  document.body.appendChild(textarea)
+
+  const selection = document.getSelection()
+  const previousRange = selection && selection.rangeCount > 0 ? selection.getRangeAt(0) : null
+
+  textarea.focus()
+  textarea.select()
+  textarea.setSelectionRange(0, textarea.value.length)
+
+  let copied = false
+  try {
+    copied = document.execCommand('copy')
+  } catch (_error) {
+    copied = false
+  }
+
+  document.body.removeChild(textarea)
+  if (selection && previousRange) {
+    selection.removeAllRanges()
+    selection.addRange(previousRange)
+  }
+
+  return copied
+}
+
 export default function SocialMediaPage() {
   const { storeId } = useActiveStore()
   const { publish } = useToast()
@@ -464,10 +506,10 @@ export default function SocialMediaPage() {
     if (!result) return
     const imageLine = result.product.imageUrl ? `Image: ${result.product.imageUrl}` : null
     const fullText = [result.post.caption, contactCta, result.post.hashtags.join(' '), imageLine].filter(Boolean).join('\n\n')
-    try {
-      await navigator.clipboard.writeText(fullText)
+    const copied = await copyTextToClipboard(fullText)
+    if (copied) {
       publish({ tone: 'success', message: 'Post text and image link copied.' })
-    } catch (_error) {
+    } else {
       publish({ tone: 'error', message: 'Clipboard not available in this browser.' })
     }
   }
@@ -478,13 +520,13 @@ export default function SocialMediaPage() {
     const imageLine = result.product.imageUrl ? `Image: ${result.product.imageUrl}` : null
     const fullText = [result.post.caption, contactCta, result.post.hashtags.join(' '), imageLine].filter(Boolean).join('\n\n')
 
-    try {
-      await navigator.clipboard.writeText(fullText)
+    const copied = await copyTextToClipboard(fullText)
+    if (copied) {
       publish({
         tone: 'success',
         message: `Draft copied with image link. Paste it in ${target === 'instagram' ? 'Instagram' : 'TikTok'}.`,
       })
-    } catch (_error) {
+    } else {
       publish({
         tone: 'error',
         message: 'Could not copy draft automatically. You can still copy manually below.',
