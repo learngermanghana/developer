@@ -164,7 +164,7 @@ const INTEGRATION_CONTRACT_VERSION = defineString('INTEGRATION_CONTRACT_VERSION'
   default: '2026-04-13',
 })
 const SEDIFEX_INTEGRATION_API_KEY = defineString('SEDIFEX_INTEGRATION_API_KEY', { default: '' })
-const BOOKING_DEFAULT_SERVICE_ID = defineString('BOOKING_DEFAULT_SERVICE_ID', { default: '' })
+const BOOKING_DEFAULT_SERVICE_ID_ENV_KEY = 'BOOKING_DEFAULT_SERVICE_ID'
 /** ============================================================================
  *  HELPERS
  * ==========================================================================*/
@@ -184,6 +184,10 @@ function getOpenAiConfig() {
   }
 
   return { apiKey, model }
+}
+
+function getBookingDefaultServiceId() {
+  return process.env[BOOKING_DEFAULT_SERVICE_ID_ENV_KEY]?.trim() || ''
 }
 
 function getIntegrationMasterApiKey(): string {
@@ -4417,7 +4421,7 @@ async function resolveIntegrationBookingServiceId(options: {
     }
   }
 
-  const defaultServiceId = BOOKING_DEFAULT_SERVICE_ID.value()?.trim() || ''
+  const defaultServiceId = getBookingDefaultServiceId()
   if (defaultServiceId) return defaultServiceId
 
   const serviceNameFallback =
