@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen, waitFor } from '@testing-library/react'
+import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import SocialMediaPage from '../SocialMediaPage'
 
@@ -147,15 +147,18 @@ describe('SocialMediaPage manual flow', () => {
     expect(await screen.findByText('Call now: +15551234567 • Email: hello@example.com')).toBeInTheDocument()
   })
 
-  it('disables download image button when image URL is missing', async () => {
+  it('shows only one copy button for full content and no download image button', async () => {
     const user = userEvent.setup()
     render(<SocialMediaPage />)
 
     await user.click(screen.getByRole('button', { name: /generate social post/i }))
 
-    await waitFor(() => {
-      expect(screen.getByRole('button', { name: /download image/i })).toBeDisabled()
-    })
+    await screen.findByText('Try our Zobo Mix today')
+    expect(screen.getByRole('button', { name: /copy text \+ image link/i })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /copy caption/i })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /copy hashtags/i })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /copy full draft/i })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /download image/i })).not.toBeInTheDocument()
   })
 
   it('normalizes mixed draft text so only caption and hashtags are shown', async () => {
@@ -191,12 +194,32 @@ describe('SocialMediaPage manual flow', () => {
     expect(screen.getByText('#AntiPimples #ClearSkin')).toBeInTheDocument()
     expect(screen.queryByText(/^Caption:/i)).not.toBeInTheDocument()
     expect(screen.queryByText(/^Hashtags:/i)).not.toBeInTheDocument()
-    expect(screen.getByRole('button', { name: /download image/i })).toBeEnabled()
+    expect(screen.getByText(/open original image, then hold\/right-click the picture to save/i)).toBeInTheDocument()
   })
 
-  it('opens instagram when send button is used', async () => {
+  it('copies text and image link before opening instagram', async () => {
     const user = userEvent.setup()
     const clipboardSpy = vi.spyOn(navigator.clipboard, 'writeText').mockResolvedValueOnce()
+    mockRequestSocialPost.mockResolvedValueOnce({
+      storeId: 'store-1',
+      productId: 'product-1',
+      product: {
+        id: 'product-1',
+        name: 'Zobo Mix',
+        category: 'Drinks',
+        description: 'Fresh and ready',
+        price: 15,
+        imageUrl: 'https://example.com/image.jpg',
+        itemType: 'product',
+      },
+      post: {
+        platform: 'instagram',
+        caption: 'Try our Zobo Mix today',
+        cta: 'Order now!',
+        hashtags: ['#zobo', '#ghana'],
+        disclaimer: null,
+      },
+    })
     render(<SocialMediaPage />)
 
     await user.click(screen.getByRole('button', { name: /generate social post/i }))
@@ -204,5 +227,39 @@ describe('SocialMediaPage manual flow', () => {
 
     expect(openSpy).toHaveBeenCalledWith('https://www.instagram.com/', '_blank', 'noopener,noreferrer')
     expect(clipboardSpy).toHaveBeenCalledWith(expect.stringContaining('Try our Zobo Mix today'))
+    expect(clipboardSpy).toHaveBeenCalledWith(expect.stringContaining('Image: https://example.com/image.jpg'))
+  })
+
+  it('copy text + image link button copies everything in one action', async () => {
+    const user = userEvent.setup()
+    const clipboardSpy = vi.spyOn(navigator.clipboard, 'writeText').mockResolvedValueOnce()
+    mockRequestSocialPost.mockResolvedValueOnce({
+      storeId: 'store-1',
+      productId: 'product-1',
+      product: {
+        id: 'product-1',
+        name: 'Zobo Mix',
+        category: 'Drinks',
+        description: 'Fresh and ready',
+        price: 15,
+        imageUrl: 'https://example.com/image.jpg',
+        itemType: 'product',
+      },
+      post: {
+        platform: 'instagram',
+        caption: 'Try our Zobo Mix today',
+        cta: 'Order now!',
+        hashtags: ['#zobo', '#ghana'],
+        disclaimer: null,
+      },
+    })
+    render(<SocialMediaPage />)
+
+    await user.click(screen.getByRole('button', { name: /generate social post/i }))
+    await user.click(await screen.findByRole('button', { name: /copy text \+ image link/i }))
+
+    expect(clipboardSpy).toHaveBeenCalledWith(expect.stringContaining('Try our Zobo Mix today'))
+    expect(clipboardSpy).toHaveBeenCalledWith(expect.stringContaining('#zobo #ghana'))
+    expect(clipboardSpy).toHaveBeenCalledWith(expect.stringContaining('Image: https://example.com/image.jpg'))
   })
 })

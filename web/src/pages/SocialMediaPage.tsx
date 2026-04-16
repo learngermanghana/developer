@@ -19,7 +19,6 @@ type ProductOption = {
 }
 
 type RegenerateTarget = 'all' | 'caption' | 'hashtags'
-type CopyTarget = 'caption' | 'hashtags' | 'full'
 type ContentTone = 'standard' | 'playful' | 'professional'
 type ContentLength = 'short' | 'medium' | 'long'
 type LaunchPlatformTarget = 'instagram' | 'tiktok'
@@ -461,67 +460,29 @@ export default function SocialMediaPage() {
     }
   }
 
-  async function handleCopy(target: CopyTarget) {
+  async function handleCopyPost() {
     if (!result) return
-    const fullText = [result.post.caption, contactCta, result.post.hashtags.join(' ')].filter(Boolean).join('\n\n')
-    const text = target === 'caption' ? result.post.caption : target === 'hashtags' ? result.post.hashtags.join(' ') : fullText
+    const imageLine = result.product.imageUrl ? `Image: ${result.product.imageUrl}` : null
+    const fullText = [result.post.caption, contactCta, result.post.hashtags.join(' '), imageLine].filter(Boolean).join('\n\n')
     try {
-      await navigator.clipboard.writeText(text)
-      publish({ tone: 'success', message: `${target === 'full' ? 'Post draft' : target} copied.` })
+      await navigator.clipboard.writeText(fullText)
+      publish({ tone: 'success', message: 'Post text and image link copied.' })
     } catch (_error) {
       publish({ tone: 'error', message: 'Clipboard not available in this browser.' })
     }
   }
 
-  async function handleImageDownload() {
-    const imageUrl = result?.product.imageUrl
-    if (!imageUrl) {
-      publish({ tone: 'error', message: 'No image available to download for this item yet.' })
-      return
-    }
-
-    const suggestedName = `social-image-${new Date().toISOString().slice(0, 10)}.jpg`
-
-    try {
-      const response = await fetch(imageUrl, { mode: 'cors' })
-      if (!response.ok) {
-        throw new Error(`Image download failed with status ${response.status}`)
-      }
-      const blob = await response.blob()
-      const blobUrl = URL.createObjectURL(blob)
-      const link = document.createElement('a')
-      link.href = blobUrl
-      link.download = suggestedName
-      document.body.appendChild(link)
-      link.click()
-      link.remove()
-      URL.revokeObjectURL(blobUrl)
-      publish({ tone: 'success', message: 'Image downloaded. Upload it in your social app next.' })
-      return
-    } catch (error) {
-      console.warn('[social-media] Blob image download failed, falling back to new tab', error)
-    }
-
-    const link = document.createElement('a')
-    link.href = imageUrl
-    link.target = '_blank'
-    link.rel = 'noopener noreferrer'
-    document.body.appendChild(link)
-    link.click()
-    link.remove()
-    publish({ tone: 'success', message: 'Opened image in a new tab. Long-press or right-click to save it.' })
-  }
-
   async function handleSendToPlatform(target: LaunchPlatformTarget) {
     if (!result) return
 
-    const fullText = [result.post.caption, contactCta, result.post.hashtags.join(' ')].filter(Boolean).join('\n\n')
+    const imageLine = result.product.imageUrl ? `Image: ${result.product.imageUrl}` : null
+    const fullText = [result.post.caption, contactCta, result.post.hashtags.join(' '), imageLine].filter(Boolean).join('\n\n')
 
     try {
       await navigator.clipboard.writeText(fullText)
       publish({
         tone: 'success',
-        message: `Draft copied. Paste it in ${target === 'instagram' ? 'Instagram' : 'TikTok'} after uploading the image.`,
+        message: `Draft copied with image link. Paste it in ${target === 'instagram' ? 'Instagram' : 'TikTok'}.`,
       })
     } catch (_error) {
       publish({
@@ -536,19 +497,22 @@ export default function SocialMediaPage() {
 
   function handleDownload() {
     if (!result) return
+    const imageLine = result.product.imageUrl ? `Image: ${result.product.imageUrl}` : ''
     const body = [
       `Platform: ${result.post.platform}`,
       `Product: ${result.product.name}`,
       '',
       'Manual upload steps:',
-      '1. Download image.',
-      `2. Upload image in the ${result.post.platform === 'instagram' ? 'Instagram' : 'TikTok'} app.`,
-      '3. Paste caption + hashtags.',
+      '1. Open the original image link.',
+      '2. Hold (mobile) or right-click (desktop) the picture to save it.',
+      `3. Upload image in the ${result.post.platform === 'instagram' ? 'Instagram' : 'TikTok'} app.`,
+      '4. Paste caption + hashtags + image link.',
       '',
       'Draft content:',
       result.post.caption,
       contactCta,
       result.post.hashtags.join(' '),
+      imageLine,
       result.post.disclaimer ? `Disclaimer: ${result.post.disclaimer}` : '',
     ]
       .filter(Boolean)
@@ -681,7 +645,12 @@ export default function SocialMediaPage() {
             <p style={{ margin: 0, whiteSpace: 'pre-wrap' }}>{contactCta}</p>
             <p style={{ margin: 0, color: 'var(--muted, #555)' }}>{result.post.hashtags.join(' ')}</p>
             {result.post.disclaimer ? <p style={{ margin: 0 }}><strong>Disclaimer:</strong> {result.post.disclaimer}</p> : null}
-            <p style={{ margin: 0 }}><strong>Selected image:</strong> {result.product.imageUrl ? 'Ready to download and upload manually.' : 'No image URL on this item yet.'}</p>
+            <p style={{ margin: 0 }}>
+              <strong>Selected image:</strong>{' '}
+              {result.product.imageUrl
+                ? 'Use Open original image, then hold/right-click the picture to save when needed.'
+                : 'No image URL on this item yet.'}
+            </p>
             {result.product.imageUrl ? (
               <p style={{ margin: 0, fontSize: 13 }}>
                 <strong>Image URL:</strong>{' '}
@@ -690,7 +659,9 @@ export default function SocialMediaPage() {
                 </a>
               </p>
             ) : null}
-            <p style={{ margin: 0, fontSize: 13, opacity: 0.8 }}>Step 1: Download image. Step 2: Use Send to Instagram/TikTok (or open app manually). Step 3: Paste caption + hashtags.</p>
+            <p style={{ margin: 0, fontSize: 13, opacity: 0.8 }}>
+              Step 1: Open original image and hold/right-click the picture to save. Step 2: Use Send to Instagram/TikTok (or open app manually). Step 3: Paste caption + hashtags + image link.
+            </p>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
               <button type="button" className="button secondary" onClick={() => void handleSendToPlatform('instagram')}>
                 Send to Instagram
@@ -698,10 +669,7 @@ export default function SocialMediaPage() {
               <button type="button" className="button secondary" onClick={() => void handleSendToPlatform('tiktok')}>
                 Send to TikTok
               </button>
-              <button type="button" className="button secondary" onClick={() => void handleCopy('caption')}>Copy caption</button>
-              <button type="button" className="button secondary" onClick={() => void handleCopy('hashtags')}>Copy hashtags</button>
-              <button type="button" className="button secondary" onClick={() => void handleCopy('full')}>Copy full draft</button>
-              <button type="button" className="button secondary" onClick={handleImageDownload} disabled={!result.product.imageUrl}>Download image</button>
+              <button type="button" className="button secondary" onClick={() => void handleCopyPost()}>Copy text + image link</button>
               <button type="button" className="button secondary" onClick={handleDownload}>Download .txt</button>
             </div>
           </div>
