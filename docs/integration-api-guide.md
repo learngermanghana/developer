@@ -171,7 +171,7 @@ Query parameters:
 - Creates a booking/registration from a website form submission.
 - Request body supports:
   - `serviceId` (recommended; if omitted, Sedifex tries to resolve from `slotId` or `BOOKING_DEFAULT_SERVICE_ID`)
-  - `slotId` (optional; when supplied, capacity is validated)
+  - `slotId` (optional; when supplied, capacity is validated; aliases `slotID` and `slot_id` are also accepted)
   - `customer` (`name` / `phone` / `email`, at least one required)
   - `quantity` (optional, defaults to `1`)
   - `notes` (optional)
