@@ -36,7 +36,8 @@ var __exportStar = (this && this.__exportStar) || function(m, exports) {
     for (var p in m) if (p !== "default" && !Object.prototype.hasOwnProperty.call(exports, p)) __createBinding(exports, m, p);
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.handlePaystackWebhook = exports.createBulkCreditsCheckout = exports.cancelPaystackSubscription = exports.createCheckout = exports.createPaystackCheckout = exports.sendBulkMessage = exports.emitBookingWebhooks = exports.emitProductWebhooks = exports.enrichProductDataAfterSave = exports.syncPublicProducts = exports.integrationTopSelling = exports.integrationCustomers = exports.integrationGoogleMerchantFeed = exports.integrationPublicCatalog = exports.integrationTikTokVideos = exports.integrationGallery = exports.v1IntegrationBookings = exports.v1IntegrationAvailability = exports.v1IntegrationPromo = exports.integrationPromo = exports.v1IntegrationProducts = exports.integrationProducts = exports.v1Products = exports.tiktokOAuthCallback = exports.startTikTokConnect = exports.revokeWebhookEndpoint = exports.upsertWebhookEndpoint = exports.listWebhookEndpoints = exports.rotateIntegrationApiKey = exports.revokeIntegrationApiKey = exports.createIntegrationApiKey = exports.listIntegrationApiKeys = exports.listStoreProducts = exports.logPaymentReminder = exports.logReceiptShareAttempt = exports.logReceiptShare = exports.commitSale = exports.manageStaffAccount = exports.generateSocialPost = exports.generateAiAdvice = exports.resolveStoreAccess = exports.initializeStore = exports.handleUserCreate = exports.googleBusinessUploadLocationMedia = exports.googleBusinessLocations = exports.googleAdsMetricsSync = exports.googleAdsCampaign = exports.googleAdsOAuthCallback = exports.googleAdsOAuthStart = exports.checkSignupUnlock = void 0;
+exports.cancelPaystackSubscription = exports.createCheckout = exports.createPaystackCheckout = exports.sendBulkMessage = exports.emitBookingWebhooks = exports.emitProductWebhooks = exports.enrichProductDataAfterSave = exports.syncPublicProducts = exports.integrationTopSelling = exports.integrationCustomers = exports.integrationGoogleMerchantFeed = exports.integrationPublicCatalog = exports.integrationTikTokVideos = exports.integrationGallery = exports.v1IntegrationBookings = exports.v1IntegrationAvailability = exports.v1IntegrationPromo = exports.integrationPromo = exports.v1IntegrationProducts = exports.integrationProducts = exports.v1Products = exports.tiktokOAuthCallback = exports.startTikTokConnect = exports.revokeWebhookEndpoint = exports.upsertWebhookEndpoint = exports.listWebhookEndpoints = exports.rotateIntegrationApiKey = exports.revokeIntegrationApiKey = exports.createIntegrationApiKey = exports.listIntegrationApiKeys = exports.listStoreProducts = exports.logPaymentReminder = exports.logReceiptShareAttempt = exports.logReceiptShare = exports.commitSale = exports.acceptStoreMasterInvite = exports.createStoreMasterInviteLink = exports.manageStaffAccount = exports.generateSocialPost = exports.generateAiAdvice = exports.resolveStoreAccess = exports.initializeStore = exports.handleUserCreate = exports.googleBusinessUploadLocationMedia = exports.googleBusinessLocations = exports.googleAdsMetricsSync = exports.googleAdsCampaign = exports.googleAdsOAuthCallback = exports.googleAdsOAuthStart = exports.checkSignupUnlock = void 0;
+exports.handlePaystackWebhook = exports.createBulkCreditsCheckout = void 0;
 // functions/src/index.ts
 const functions = __importStar(require("firebase-functions/v1"));
 const crypto = __importStar(require("crypto"));
@@ -435,6 +436,51 @@ function normalizeManageStaffPayload(data) {
         ? actionRaw
         : 'invite';
     return { storeId, email, role, password, action };
+}
+function normalizeCreateStoreMasterInvitePayload(data) {
+    const storeId = typeof data?.storeId === 'string' ? data.storeId.trim() : '';
+    if (!storeId)
+        throw new functions.https.HttpsError('invalid-argument', 'A storeId is required');
+    const roleRaw = typeof data?.role === 'string' ? data.role.trim().toLowerCase() : 'staff';
+    const role = roleRaw === 'owner' ? 'owner' : 'staff';
+    const expiresInHoursRaw = typeof data?.expiresInHours === 'number' && Number.isFinite(data.expiresInHours)
+        ? Math.floor(data.expiresInHours)
+        : 168;
+    const expiresInHours = Math.min(Math.max(expiresInHoursRaw, 1), 24 * 30);
+    const maxUsesRaw = typeof data?.maxUses === 'number' && Number.isFinite(data.maxUses)
+        ? Math.floor(data.maxUses)
+        : 1;
+    const maxUses = Math.min(Math.max(maxUsesRaw, 1), 200);
+    return { storeId, role, expiresInHours, maxUses };
+}
+function extractInviteToken(tokenOrUrl) {
+    const value = tokenOrUrl.trim();
+    if (!value)
+        return '';
+    if (value.includes('://')) {
+        try {
+            const parsed = new URL(value);
+            const token = parsed.searchParams.get('token') || parsed.searchParams.get('invite');
+            return token ? token.trim() : '';
+        }
+        catch {
+            return '';
+        }
+    }
+    return value;
+}
+function normalizeAcceptStoreMasterInvitePayload(data) {
+    const tokenOrUrl = typeof data?.tokenOrUrl === 'string' ? data.tokenOrUrl : '';
+    const token = extractInviteToken(tokenOrUrl);
+    const childStoreId = typeof data?.childStoreId === 'string' ? data.childStoreId.trim() : '';
+    const confirmOverwrite = data?.confirmOverwrite === true;
+    if (!token) {
+        throw new functions.https.HttpsError('invalid-argument', 'A valid invite token is required');
+    }
+    if (!childStoreId) {
+        throw new functions.https.HttpsError('invalid-argument', 'A childStoreId is required');
+    }
+    return { token, childStoreId, confirmOverwrite };
 }
 function normalizeListProductsPayload(data) {
     const storeId = typeof data?.storeId === 'string' ? data.storeId.trim() : '';
@@ -1191,6 +1237,122 @@ exports.manageStaffAccount = functions.https.onCall(async (data, context) => {
         });
         throw error;
     }
+});
+exports.createStoreMasterInviteLink = functions.https.onCall(async (data, context) => {
+    assertOwnerAccess(context);
+    const { storeId, role, expiresInHours, maxUses } = normalizeCreateStoreMasterInvitePayload(data);
+    const actorUid = context.auth.uid;
+    await verifyOwnerForStore(actorUid, storeId);
+    const token = crypto.randomBytes(24).toString('base64url');
+    const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
+    const now = Date.now();
+    const expiresAt = firestore_1.admin.firestore.Timestamp.fromMillis(now + expiresInHours * 60 * 60 * 1000);
+    const inviteRef = firestore_1.defaultDb.collection('storeMasterInvites').doc();
+    await inviteRef.set({
+        storeId,
+        role,
+        tokenHash,
+        status: 'active',
+        maxUses,
+        usesCount: 0,
+        createdBy: actorUid,
+        createdAt: firestore_1.admin.firestore.FieldValue.serverTimestamp(),
+        updatedAt: firestore_1.admin.firestore.FieldValue.serverTimestamp(),
+        expiresAt,
+    });
+    const projectId = process.env.GCLOUD_PROJECT || '';
+    const inviteUrl = projectId
+        ? `https://${projectId}.web.app/store-link/accept?token=${encodeURIComponent(token)}`
+        : `store-link://accept?token=${encodeURIComponent(token)}`;
+    return {
+        ok: true,
+        storeId,
+        role,
+        inviteToken: token,
+        inviteUrl,
+        maxUses,
+        expiresAt: expiresAt.toDate().toISOString(),
+    };
+});
+exports.acceptStoreMasterInvite = functions.https.onCall(async (data, context) => {
+    assertOwnerAccess(context);
+    const { token, childStoreId, confirmOverwrite } = normalizeAcceptStoreMasterInvitePayload(data);
+    const actorUid = context.auth.uid;
+    await verifyOwnerForStore(actorUid, childStoreId);
+    const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
+    const inviteSnap = await firestore_1.defaultDb
+        .collection('storeMasterInvites')
+        .where('tokenHash', '==', tokenHash)
+        .limit(1)
+        .get();
+    if (inviteSnap.empty) {
+        throw new functions.https.HttpsError('not-found', 'Invite link is invalid or no longer available');
+    }
+    const inviteDoc = inviteSnap.docs[0];
+    const inviteData = (inviteDoc.data() ?? {});
+    const parentStoreId = typeof inviteData.storeId === 'string' ? inviteData.storeId.trim() : '';
+    const role = inviteData.role === 'owner' ? 'owner' : 'staff';
+    const status = typeof inviteData.status === 'string' ? inviteData.status : 'active';
+    const maxUses = typeof inviteData.maxUses === 'number' ? inviteData.maxUses : 1;
+    const usesCount = typeof inviteData.usesCount === 'number' ? inviteData.usesCount : 0;
+    const expiresAt = inviteData.expiresAt instanceof firestore_1.admin.firestore.Timestamp ? inviteData.expiresAt : null;
+    if (!parentStoreId) {
+        throw new functions.https.HttpsError('failed-precondition', 'Invite parent store is missing');
+    }
+    if (status !== 'active') {
+        throw new functions.https.HttpsError('failed-precondition', 'Invite link is no longer active');
+    }
+    if (expiresAt && expiresAt.toMillis() <= Date.now()) {
+        throw new functions.https.HttpsError('deadline-exceeded', 'Invite link has expired');
+    }
+    if (maxUses > 0 && usesCount >= maxUses) {
+        throw new functions.https.HttpsError('resource-exhausted', 'Invite link has reached its usage limit');
+    }
+    if (parentStoreId === childStoreId) {
+        throw new functions.https.HttpsError('invalid-argument', 'You cannot link a workspace to itself as a sub-store');
+    }
+    const childRef = firestore_1.defaultDb.collection('stores').doc(childStoreId);
+    const inviteRef = inviteDoc.ref;
+    const eventRef = firestore_1.defaultDb.collection('storeLinkAudit').doc();
+    const overwritten = await firestore_1.defaultDb.runTransaction(async (transaction) => {
+        const childSnap = await transaction.get(childRef);
+        const childData = (childSnap.data() ?? {});
+        const currentParent = typeof childData.parentStoreId === 'string' ? childData.parentStoreId.trim() : '';
+        if (currentParent && currentParent !== parentStoreId && !confirmOverwrite) {
+            throw new functions.https.HttpsError('failed-precondition', 'This workspace is already linked to a different mother store. Confirm overwrite to continue.');
+        }
+        const nextUsesCount = usesCount + 1;
+        transaction.set(childRef, {
+            parentStoreId,
+            parentLinkRole: role,
+            parentLinkedBy: actorUid,
+            parentLinkedAt: firestore_1.admin.firestore.FieldValue.serverTimestamp(),
+            updatedAt: firestore_1.admin.firestore.FieldValue.serverTimestamp(),
+        }, { merge: true });
+        transaction.set(inviteRef, {
+            usesCount: nextUsesCount,
+            updatedAt: firestore_1.admin.firestore.FieldValue.serverTimestamp(),
+            status: maxUses > 0 && nextUsesCount >= maxUses ? 'consumed' : 'active',
+        }, { merge: true });
+        transaction.set(eventRef, {
+            parentStoreId,
+            childStoreId,
+            role,
+            actorUid,
+            inviteId: inviteDoc.id,
+            previousParentStoreId: currentParent || null,
+            overwritten: Boolean(currentParent && currentParent !== parentStoreId),
+            createdAt: firestore_1.admin.firestore.FieldValue.serverTimestamp(),
+        });
+        return Boolean(currentParent && currentParent !== parentStoreId);
+    });
+    return {
+        ok: true,
+        parentStoreId,
+        childStoreId,
+        role,
+        overwritten,
+    };
 });
 /** ============================================================================
  *  CALLABLE: commitSale (staff)
@@ -3616,6 +3778,52 @@ exports.v1IntegrationBookings = functions.https.onRequest(async (req, res) => {
     const slotId = toTrimmedStringOrNull(payload.slotId) ??
         toTrimmedStringOrNull(payload.slotID) ??
         toTrimmedStringOrNull(payload.slot_id);
+    const payloadAttributes = toPlainObject(payload.attributes);
+    const pickBookingString = (...values) => {
+        for (const value of values) {
+            const normalized = toTrimmedStringOrNull(value);
+            if (normalized)
+                return normalized;
+        }
+        return null;
+    };
+    const pickBookingAmount = (...values) => {
+        for (const value of values) {
+            const numeric = toFiniteNumberOrNull(value);
+            if (numeric !== null)
+                return numeric;
+            const normalized = toTrimmedStringOrNull(value);
+            if (normalized)
+                return normalized;
+        }
+        return null;
+    };
+    const pickBookingBoolean = (...values) => {
+        for (const value of values) {
+            if (typeof value === 'boolean')
+                return value;
+            if (typeof value === 'string') {
+                const normalized = value.trim().toLowerCase();
+                if (normalized === 'true' || normalized === 'yes')
+                    return true;
+                if (normalized === 'false' || normalized === 'no')
+                    return false;
+            }
+        }
+        return null;
+    };
+    const bookingDate = pickBookingString(payload.date, payload.bookingDate, payloadAttributes.date, payloadAttributes.bookingDate);
+    const bookingTime = pickBookingString(payload.time, payload.bookingTime, payloadAttributes.time, payloadAttributes.bookingTime);
+    const preferredBranch = pickBookingString(payload.preferredBranch, payload.branch, payload.branchName, payloadAttributes.preferredBranch, payloadAttributes.branch, payloadAttributes.branchName);
+    const sessionType = pickBookingString(payload.sessionType, payload.duration, payload.sessionDuration, payloadAttributes.sessionType, payloadAttributes.duration, payloadAttributes.sessionDuration);
+    const therapistPreference = pickBookingString(payload.therapistPreference, payload.preferredTherapist, payloadAttributes.therapistPreference, payloadAttributes.preferredTherapist);
+    const preferredContactMethod = pickBookingString(payload.preferredContactMethod, payload.contactMethod, payloadAttributes.preferredContactMethod, payloadAttributes.contactMethod);
+    const depositAmount = pickBookingAmount(payload.depositAmount, payload.depositPaid, payload.amountPaid, payloadAttributes.depositAmount, payloadAttributes.depositPaid, payloadAttributes.amountPaid);
+    const paymentMethod = pickBookingString(payload.paymentMethod, payloadAttributes.paymentMethod);
+    const paymentScreenshotUrl = pickBookingString(payload.paymentScreenshotUrl, payload.screenshotUrl, payloadAttributes.paymentScreenshotUrl, payloadAttributes.screenshotUrl);
+    const paymentScreenshotReady = pickBookingBoolean(payload.paymentScreenshotReady, payloadAttributes.paymentScreenshotReady);
+    const noRefundAccepted = pickBookingBoolean(payload.noRefundAccepted, payload.agreeNoRefundPolicy, payloadAttributes.noRefundAccepted, payloadAttributes.agreeNoRefundPolicy);
+    const serviceName = pickBookingString(payload.serviceName, payload.productName, payload.service_note_name, payload.internalServiceName, payloadAttributes.serviceName, payloadAttributes.productName, payloadAttributes.service_note_name, payloadAttributes.internalServiceName);
     const quantityRaw = toFiniteNumber(payload.quantity, 1);
     const quantity = Math.max(1, Math.floor(quantityRaw));
     const customer = toPlainObject(payload.customer);
@@ -3642,9 +3850,24 @@ exports.v1IntegrationBookings = functions.https.onRequest(async (req, res) => {
             phone: customerPhone,
             email: customerEmail,
         },
+        name: customerName,
+        phone: customerPhone,
+        email: customerEmail,
+        serviceName,
+        date: bookingDate,
+        time: bookingTime,
+        preferredBranch,
+        sessionType,
+        therapistPreference,
+        preferredContactMethod,
+        depositAmount,
+        paymentMethod,
+        paymentScreenshotUrl,
+        paymentScreenshotReady,
+        noRefundAccepted,
         quantity,
         notes: toTrimmedStringOrNull(payload.notes),
-        attributes: toPlainObject(payload.attributes),
+        attributes: payloadAttributes,
         source: 'website',
         createdAt: now,
         updatedAt: now,

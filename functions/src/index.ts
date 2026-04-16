@@ -4763,6 +4763,96 @@ export const v1IntegrationBookings = functions.https.onRequest(async (req, res) 
     toTrimmedStringOrNull(payload.slotId) ??
     toTrimmedStringOrNull(payload.slotID) ??
     toTrimmedStringOrNull(payload.slot_id)
+  const payloadAttributes = toPlainObject(payload.attributes)
+  const pickBookingString = (...values: unknown[]) => {
+    for (const value of values) {
+      const normalized = toTrimmedStringOrNull(value)
+      if (normalized) return normalized
+    }
+    return null
+  }
+  const pickBookingAmount = (...values: unknown[]) => {
+    for (const value of values) {
+      const numeric = toFiniteNumberOrNull(value)
+      if (numeric !== null) return numeric
+      const normalized = toTrimmedStringOrNull(value)
+      if (normalized) return normalized
+    }
+    return null
+  }
+  const pickBookingBoolean = (...values: unknown[]) => {
+    for (const value of values) {
+      if (typeof value === 'boolean') return value
+      if (typeof value === 'string') {
+        const normalized = value.trim().toLowerCase()
+        if (normalized === 'true' || normalized === 'yes') return true
+        if (normalized === 'false' || normalized === 'no') return false
+      }
+    }
+    return null
+  }
+  const bookingDate = pickBookingString(payload.date, payload.bookingDate, payloadAttributes.date, payloadAttributes.bookingDate)
+  const bookingTime = pickBookingString(payload.time, payload.bookingTime, payloadAttributes.time, payloadAttributes.bookingTime)
+  const preferredBranch = pickBookingString(
+    payload.preferredBranch,
+    payload.branch,
+    payload.branchName,
+    payloadAttributes.preferredBranch,
+    payloadAttributes.branch,
+    payloadAttributes.branchName,
+  )
+  const sessionType = pickBookingString(
+    payload.sessionType,
+    payload.duration,
+    payload.sessionDuration,
+    payloadAttributes.sessionType,
+    payloadAttributes.duration,
+    payloadAttributes.sessionDuration,
+  )
+  const therapistPreference = pickBookingString(
+    payload.therapistPreference,
+    payload.preferredTherapist,
+    payloadAttributes.therapistPreference,
+    payloadAttributes.preferredTherapist,
+  )
+  const preferredContactMethod = pickBookingString(
+    payload.preferredContactMethod,
+    payload.contactMethod,
+    payloadAttributes.preferredContactMethod,
+    payloadAttributes.contactMethod,
+  )
+  const depositAmount = pickBookingAmount(
+    payload.depositAmount,
+    payload.depositPaid,
+    payload.amountPaid,
+    payloadAttributes.depositAmount,
+    payloadAttributes.depositPaid,
+    payloadAttributes.amountPaid,
+  )
+  const paymentMethod = pickBookingString(payload.paymentMethod, payloadAttributes.paymentMethod)
+  const paymentScreenshotUrl = pickBookingString(
+    payload.paymentScreenshotUrl,
+    payload.screenshotUrl,
+    payloadAttributes.paymentScreenshotUrl,
+    payloadAttributes.screenshotUrl,
+  )
+  const paymentScreenshotReady = pickBookingBoolean(payload.paymentScreenshotReady, payloadAttributes.paymentScreenshotReady)
+  const noRefundAccepted = pickBookingBoolean(
+    payload.noRefundAccepted,
+    payload.agreeNoRefundPolicy,
+    payloadAttributes.noRefundAccepted,
+    payloadAttributes.agreeNoRefundPolicy,
+  )
+  const serviceName = pickBookingString(
+    payload.serviceName,
+    payload.productName,
+    payload.service_note_name,
+    payload.internalServiceName,
+    payloadAttributes.serviceName,
+    payloadAttributes.productName,
+    payloadAttributes.service_note_name,
+    payloadAttributes.internalServiceName,
+  )
   const quantityRaw = toFiniteNumber(payload.quantity, 1)
   const quantity = Math.max(1, Math.floor(quantityRaw))
   const customer = toPlainObject(payload.customer)
@@ -4790,9 +4880,24 @@ export const v1IntegrationBookings = functions.https.onRequest(async (req, res) 
       phone: customerPhone,
       email: customerEmail,
     },
+    name: customerName,
+    phone: customerPhone,
+    email: customerEmail,
+    serviceName,
+    date: bookingDate,
+    time: bookingTime,
+    preferredBranch,
+    sessionType,
+    therapistPreference,
+    preferredContactMethod,
+    depositAmount,
+    paymentMethod,
+    paymentScreenshotUrl,
+    paymentScreenshotReady,
+    noRefundAccepted,
     quantity,
     notes: toTrimmedStringOrNull(payload.notes),
-    attributes: toPlainObject(payload.attributes),
+    attributes: payloadAttributes,
     source: 'website',
     createdAt: now,
     updatedAt: now,
