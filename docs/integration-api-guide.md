@@ -176,6 +176,10 @@ Query parameters:
   - `quantity` (optional, defaults to `1`)
   - `notes` (optional)
   - `attributes` (optional flexible object for vertical-specific fields)
+- Customer auto-mapping:
+  - When `customer.phone` or `customer.email` is provided, Sedifex automatically upserts the contact into the store `customers` collection.
+  - Existing customer records are matched by `storeId + phone` first, then `storeId + email`.
+  - New customer records are tagged with `source: "integrationBooking"` for later segmentation.
 
 ## 4) Deduplication and caching
 

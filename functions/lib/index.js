@@ -2632,6 +2632,85 @@ function mapIntegrationBookingDoc(docSnap) {
         updatedAt: normalizeTimestampIso(data.updatedAt),
     };
 }
+function normalizeIdentityValue(value) {
+    if (!value)
+        return null;
+    return value.trim().toLowerCase();
+}
+function normalizePhoneValue(value) {
+    if (!value)
+        return null;
+    const normalized = value.replace(/\s+/g, '').trim();
+    return normalized || null;
+}
+async function upsertBookingCustomerProfile(options) {
+    const { storeId, customerName, customerPhone, customerEmail, bookingId } = options;
+    const normalizedPhone = normalizePhoneValue(customerPhone);
+    const normalizedEmail = normalizeIdentityValue(customerEmail);
+    if (!normalizedPhone && !normalizedEmail) {
+        return;
+    }
+    const customerLookupSnapshots = await Promise.all([
+        normalizedPhone
+            ? firestore_1.defaultDb
+                .collection('customers')
+                .where('storeId', '==', storeId)
+                .where('phone', '==', normalizedPhone)
+                .limit(1)
+                .get()
+            : Promise.resolve(null),
+        normalizedEmail
+            ? firestore_1.defaultDb
+                .collection('customers')
+                .where('storeId', '==', storeId)
+                .where('email', '==', normalizedEmail)
+                .limit(1)
+                .get()
+            : Promise.resolve(null),
+    ]);
+    const existingCustomerDoc = customerLookupSnapshots[0]?.docs?.[0] ?? customerLookupSnapshots[1]?.docs?.[0] ?? null;
+    const now = firestore_1.admin.firestore.FieldValue.serverTimestamp();
+    const nameToPersist = customerName ?? customerEmail ?? customerPhone ?? 'Booking customer';
+    if (existingCustomerDoc) {
+        const existingData = (existingCustomerDoc.data() ?? {});
+        const updates = {
+            updatedAt: now,
+            lastBookingId: bookingId,
+            lastBookingAt: now,
+            lastBookingSource: 'integrationBooking',
+            bookingCount: firestore_1.admin.firestore.FieldValue.increment(1),
+        };
+        if (!toTrimmedStringOrNull(existingData.name) && customerName) {
+            updates.name = customerName;
+        }
+        if (!toTrimmedStringOrNull(existingData.displayName) && customerName) {
+            updates.displayName = customerName;
+        }
+        if (!toTrimmedStringOrNull(existingData.phone) && normalizedPhone) {
+            updates.phone = normalizedPhone;
+        }
+        if (!toTrimmedStringOrNull(existingData.email) && normalizedEmail) {
+            updates.email = normalizedEmail;
+        }
+        await existingCustomerDoc.ref.set(updates, { merge: true });
+        return;
+    }
+    const customerRef = firestore_1.defaultDb.collection('customers').doc();
+    await customerRef.set({
+        storeId,
+        name: nameToPersist,
+        displayName: nameToPersist,
+        phone: normalizedPhone,
+        email: normalizedEmail,
+        createdAt: now,
+        updatedAt: now,
+        source: 'integrationBooking',
+        firstBookingId: bookingId,
+        lastBookingId: bookingId,
+        lastBookingAt: now,
+        bookingCount: 1,
+    });
+}
 async function validateIntegrationTokenOrReply(req, res, options) {
     const allowedMethods = options?.allowedMethods ?? ['GET'];
     if (!allowedMethods.includes(req.method ?? '')) {
@@ -3335,6 +3414,13 @@ exports.v1IntegrationBookings = functions.https.onRequest(async (req, res) => {
         await bookingRef.set(bookingData);
         const bookingSnap = await bookingRef.get();
         const booking = mapIntegrationBookingDoc(bookingSnap);
+        await upsertBookingCustomerProfile({
+            storeId: authContext.storeId,
+            customerName,
+            customerPhone,
+            customerEmail,
+            bookingId: bookingRef.id,
+        });
         res.status(201).json({
             booking,
         });
@@ -3386,6 +3472,13 @@ exports.v1IntegrationBookings = functions.https.onRequest(async (req, res) => {
     }
     const bookingSnap = await bookingRef.get();
     const booking = mapIntegrationBookingDoc(bookingSnap);
+    await upsertBookingCustomerProfile({
+        storeId: authContext.storeId,
+        customerName,
+        customerPhone,
+        customerEmail,
+        bookingId: bookingRef.id,
+    });
     res.status(201).json({
         booking,
     });
