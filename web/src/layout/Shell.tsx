@@ -470,7 +470,10 @@ export default function Shell({ children }: { children: React.ReactNode }) {
       {selectableMemberships.length <= 1 && (
         <p className="shell__store-link-hint">
           To link more stores, ask each workspace owner to add{' '}
-          <strong>{userEmail}</strong> as staff or owner in Team Members.
+          <strong>{userEmail}</strong> as staff or owner in Team Members. Each
+          row must use that store&apos;s own <code>storeId</code> (not{' '}
+          <code>{storeId ?? 'your current store id'}</code>) and this account&apos;s UID{' '}
+          <code>{user?.uid ?? 'unknown'}</code>.
         </p>
       )}
 
