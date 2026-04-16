@@ -164,7 +164,7 @@ const INTEGRATION_CONTRACT_VERSION = defineString('INTEGRATION_CONTRACT_VERSION'
   default: '2026-04-13',
 })
 const SEDIFEX_INTEGRATION_API_KEY = defineString('SEDIFEX_INTEGRATION_API_KEY', { default: '' })
-const BOOKING_DEFAULT_SERVICE_ID = defineString('BOOKING_DEFAULT_SERVICE_ID', { default: '' })
+const BOOKING_DEFAULT_SERVICE_ID_ENV_KEY = 'BOOKING_DEFAULT_SERVICE_ID'
 /** ============================================================================
  *  HELPERS
  * ==========================================================================*/
@@ -184,6 +184,10 @@ function getOpenAiConfig() {
   }
 
   return { apiKey, model }
+}
+
+function getBookingDefaultServiceId() {
+  return process.env[BOOKING_DEFAULT_SERVICE_ID_ENV_KEY]?.trim() || ''
 }
 
 function getIntegrationMasterApiKey(): string {
@@ -4417,10 +4421,28 @@ async function resolveIntegrationBookingServiceId(options: {
     }
   }
 
-  const defaultServiceId = BOOKING_DEFAULT_SERVICE_ID.value()?.trim() || ''
+  const defaultServiceId = getBookingDefaultServiceId()
   if (defaultServiceId) return defaultServiceId
 
-  return null
+  const serviceNameFallback =
+    toTrimmedStringOrNull(payload.productName) ??
+    toTrimmedStringOrNull(payload.product_name) ??
+    toTrimmedStringOrNull(payload.serviceName) ??
+    toTrimmedStringOrNull(payload.service_name) ??
+    toTrimmedStringOrNull(payload.name) ??
+    toTrimmedStringOrNull(payload.title)
+  if (serviceNameFallback) {
+    const normalized = serviceNameFallback
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-+|-+$/g, '')
+      .slice(0, 60)
+    if (normalized) {
+      return `name:${normalized}`
+    }
+  }
+
+  return 'unspecified-service'
 }
 
 export const v1IntegrationBookings = functions.https.onRequest(async (req, res) => {
@@ -4506,7 +4528,8 @@ export const v1IntegrationBookings = functions.https.onRequest(async (req, res) 
   if (!serviceId) {
     res.status(400).json({
       error: 'service-not-resolved',
-      message: 'Service could not be resolved. Configure BOOKING_DEFAULT_SERVICE_ID or provide serviceId.',
+      message:
+        'Service could not be resolved. Configure BOOKING_DEFAULT_SERVICE_ID, provide serviceId, or include product/service name.',
     })
     return
   }
