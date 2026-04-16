@@ -11,6 +11,7 @@ import Products from './pages/Products'
 import Sell from './pages/Sell'
 import CloseDay from './pages/CloseDay'
 import Customers from './pages/Customers'
+import Bookings from './pages/Bookings'
 import Logi from './pages/Logi'
 import Onboarding from './pages/Onboarding'
 import AccountOverview from './pages/AccountOverview'
@@ -70,6 +71,7 @@ const router = createBrowserRouter([
           { path: 'products', element: <Products /> },
           { path: 'sell', element: <Sell /> },
           { path: 'customers', element: <Customers /> },
+          { path: 'bookings', element: <Bookings /> },
           { path: 'data-transfer', element: <DataTransfer /> },
           { path: 'bulk-messaging', element: <BulkMessaging /> },
           { path: 'logi', element: <Logi /> },
