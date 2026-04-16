@@ -4399,7 +4399,10 @@ async function resolveIntegrationBookingServiceId(options: {
     toTrimmedStringOrNull(payload.service_id)
   if (explicitServiceId) return explicitServiceId
 
-  const slotId = toTrimmedStringOrNull(payload.slotId)
+  const slotId =
+    toTrimmedStringOrNull(payload.slotId) ??
+    toTrimmedStringOrNull(payload.slotID) ??
+    toTrimmedStringOrNull(payload.slot_id)
   if (slotId) {
     const slotSnapshot = await db
       .collection('stores')
@@ -4508,7 +4511,10 @@ export const v1IntegrationBookings = functions.https.onRequest(async (req, res) 
     return
   }
 
-  const slotId = toTrimmedStringOrNull(payload.slotId)
+  const slotId =
+    toTrimmedStringOrNull(payload.slotId) ??
+    toTrimmedStringOrNull(payload.slotID) ??
+    toTrimmedStringOrNull(payload.slot_id)
   const quantityRaw = toFiniteNumber(payload.quantity, 1)
   const quantity = Math.max(1, Math.floor(quantityRaw))
   const customer = toPlainObject(payload.customer)

@@ -36,7 +36,7 @@ var __exportStar = (this && this.__exportStar) || function(m, exports) {
     for (var p in m) if (p !== "default" && !Object.prototype.hasOwnProperty.call(exports, p)) __createBinding(exports, m, p);
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.handlePaystackWebhook = exports.createBulkCreditsCheckout = exports.cancelPaystackSubscription = exports.createCheckout = exports.createPaystackCheckout = exports.sendBulkMessage = exports.emitProductWebhooks = exports.enrichProductDataAfterSave = exports.syncPublicProducts = exports.integrationTopSelling = exports.integrationCustomers = exports.integrationGoogleMerchantFeed = exports.integrationPublicCatalog = exports.integrationTikTokVideos = exports.integrationGallery = exports.v1IntegrationBookings = exports.v1IntegrationAvailability = exports.v1IntegrationPromo = exports.integrationPromo = exports.v1IntegrationProducts = exports.integrationProducts = exports.v1Products = exports.tiktokOAuthCallback = exports.startTikTokConnect = exports.rotateIntegrationApiKey = exports.revokeIntegrationApiKey = exports.createIntegrationApiKey = exports.listIntegrationApiKeys = exports.listStoreProducts = exports.logPaymentReminder = exports.logReceiptShareAttempt = exports.logReceiptShare = exports.commitSale = exports.manageStaffAccount = exports.generateSocialPost = exports.generateAiAdvice = exports.resolveStoreAccess = exports.initializeStore = exports.handleUserCreate = exports.googleBusinessUploadLocationMedia = exports.googleBusinessLocations = exports.googleAdsMetricsSync = exports.googleAdsCampaign = exports.googleAdsOAuthCallback = exports.googleAdsOAuthStart = exports.checkSignupUnlock = void 0;
+exports.handlePaystackWebhook = exports.createBulkCreditsCheckout = exports.cancelPaystackSubscription = exports.createCheckout = exports.createPaystackCheckout = exports.sendBulkMessage = exports.emitBookingWebhooks = exports.emitProductWebhooks = exports.enrichProductDataAfterSave = exports.syncPublicProducts = exports.integrationTopSelling = exports.integrationCustomers = exports.integrationGoogleMerchantFeed = exports.integrationPublicCatalog = exports.integrationTikTokVideos = exports.integrationGallery = exports.v1IntegrationBookings = exports.v1IntegrationAvailability = exports.v1IntegrationPromo = exports.integrationPromo = exports.v1IntegrationProducts = exports.integrationProducts = exports.v1Products = exports.tiktokOAuthCallback = exports.startTikTokConnect = exports.revokeWebhookEndpoint = exports.upsertWebhookEndpoint = exports.listWebhookEndpoints = exports.rotateIntegrationApiKey = exports.revokeIntegrationApiKey = exports.createIntegrationApiKey = exports.listIntegrationApiKeys = exports.listStoreProducts = exports.logPaymentReminder = exports.logReceiptShareAttempt = exports.logReceiptShare = exports.commitSale = exports.manageStaffAccount = exports.generateSocialPost = exports.generateAiAdvice = exports.resolveStoreAccess = exports.initializeStore = exports.handleUserCreate = exports.googleBusinessUploadLocationMedia = exports.googleBusinessLocations = exports.googleAdsMetricsSync = exports.googleAdsCampaign = exports.googleAdsOAuthCallback = exports.googleAdsOAuthStart = exports.checkSignupUnlock = void 0;
 // functions/src/index.ts
 const functions = __importStar(require("firebase-functions/v1"));
 const crypto = __importStar(require("crypto"));
@@ -69,6 +69,7 @@ const INTEGRATION_CONTRACT_VERSION = (0, params_1.defineString)('INTEGRATION_CON
     default: '2026-04-13',
 });
 const SEDIFEX_INTEGRATION_API_KEY = (0, params_1.defineString)('SEDIFEX_INTEGRATION_API_KEY', { default: '' });
+const BOOKING_DEFAULT_SERVICE_ID = (0, params_1.defineString)('BOOKING_DEFAULT_SERVICE_ID', { default: '' });
 /** ============================================================================
  *  HELPERS
  * ==========================================================================*/
@@ -1680,6 +1681,58 @@ function normalizeOptionalStoreId(value) {
     const storeId = typeof value === 'string' ? value.trim() : '';
     return storeId || null;
 }
+function normalizeWebhookEndpointId(endpointIdRaw) {
+    const endpointId = typeof endpointIdRaw === 'string' ? endpointIdRaw.trim() : '';
+    if (!endpointId)
+        throw new functions.https.HttpsError('invalid-argument', 'endpointId is required.');
+    return endpointId;
+}
+function normalizeWebhookUrl(urlRaw) {
+    const url = typeof urlRaw === 'string' ? urlRaw.trim() : '';
+    if (!url)
+        throw new functions.https.HttpsError('invalid-argument', 'Endpoint URL is required.');
+    let parsed;
+    try {
+        parsed = new URL(url);
+    }
+    catch {
+        throw new functions.https.HttpsError('invalid-argument', 'Endpoint URL must be a valid URL.');
+    }
+    if (parsed.protocol !== 'https:') {
+        throw new functions.https.HttpsError('invalid-argument', 'Endpoint URL must use https://');
+    }
+    return parsed.toString();
+}
+function normalizeWebhookSecret(secretRaw) {
+    const secret = typeof secretRaw === 'string' ? secretRaw.trim() : '';
+    if (secret.length < 8) {
+        throw new functions.https.HttpsError('invalid-argument', 'Webhook secret must be at least 8 characters long.');
+    }
+    if (secret.length > 256) {
+        throw new functions.https.HttpsError('invalid-argument', 'Webhook secret must be 256 characters or less.');
+    }
+    return secret;
+}
+const ALLOWED_WEBHOOK_EVENTS = new Set([
+    'booking.created',
+    'booking.updated',
+    'booking.cancelled',
+    'booking.confirmed',
+    'booking.approved',
+    'product.created',
+    'product.updated',
+    'product.deleted',
+]);
+function normalizeWebhookEvents(eventsRaw) {
+    const source = Array.isArray(eventsRaw) ? eventsRaw : [];
+    const normalized = Array.from(new Set(source
+        .map(value => (typeof value === 'string' ? value.trim().toLowerCase() : ''))
+        .filter(eventType => eventType && ALLOWED_WEBHOOK_EVENTS.has(eventType))));
+    if (normalized.length === 0) {
+        return ['booking.created', 'booking.updated', 'booking.cancelled', 'booking.confirmed'];
+    }
+    return normalized;
+}
 function shortMask(value) {
     if (value.length <= 8)
         return '••••••••';
@@ -1894,6 +1947,136 @@ exports.rotateIntegrationApiKey = functions.https.onCall(async (data, context) =
         },
         token,
     };
+});
+/** ============================================================================
+ *  CALLABLES: webhook endpoints (owner)
+ * ==========================================================================*/
+exports.listWebhookEndpoints = functions.https.onCall(async (_data, context) => {
+    assertOwnerAccess(context);
+    const uid = context.auth.uid;
+    const storeId = await resolveStaffStoreId(uid);
+    await verifyOwnerForStore(uid, storeId);
+    let snapshot;
+    try {
+        snapshot = await firestore_1.defaultDb
+            .collection('webhookEndpoints')
+            .where('storeId', '==', storeId)
+            .orderBy('createdAt', 'desc')
+            .limit(50)
+            .get();
+    }
+    catch (queryError) {
+        if (!isFirestoreMissingIndexError(queryError))
+            throw queryError;
+        snapshot = await firestore_1.defaultDb.collection('webhookEndpoints').where('storeId', '==', storeId).limit(200).get();
+    }
+    const endpoints = snapshot.docs
+        .map(docSnap => {
+        const data = docSnap.data();
+        return {
+            id: docSnap.id,
+            url: typeof data.url === 'string' ? data.url : '',
+            status: data.status === 'revoked' ? 'revoked' : 'active',
+            events: Array.isArray(data.events)
+                ? data.events.filter(item => typeof item === 'string')
+                : [],
+            createdAt: data.createdAt instanceof firestore_1.admin.firestore.Timestamp ? data.createdAt : null,
+            updatedAt: data.updatedAt instanceof firestore_1.admin.firestore.Timestamp ? data.updatedAt : null,
+            revokedAt: data.revokedAt instanceof firestore_1.admin.firestore.Timestamp ? data.revokedAt : null,
+            hasSecret: typeof data.secret === 'string' && data.secret.trim().length > 0,
+        };
+    })
+        .filter(endpoint => endpoint.id && endpoint.url)
+        .sort((a, b) => (b.createdAt?.toMillis() ?? 0) - (a.createdAt?.toMillis() ?? 0))
+        .slice(0, 50);
+    return { storeId, endpoints };
+});
+exports.upsertWebhookEndpoint = functions.https.onCall(async (data, context) => {
+    assertOwnerAccess(context);
+    const uid = context.auth.uid;
+    const storeId = await resolveStaffStoreId(uid);
+    await verifyOwnerForStore(uid, storeId);
+    const url = normalizeWebhookUrl(data?.url);
+    const secret = normalizeWebhookSecret(data?.secret);
+    const events = normalizeWebhookEvents(data?.events);
+    const endpointId = normalizeOptionalStoreId(data?.endpointId);
+    const timestamp = firestore_1.admin.firestore.FieldValue.serverTimestamp();
+    let endpointRef;
+    if (endpointId) {
+        endpointRef = firestore_1.defaultDb.collection('webhookEndpoints').doc(endpointId);
+        const existing = await endpointRef.get();
+        if (!existing.exists) {
+            throw new functions.https.HttpsError('not-found', 'Webhook endpoint not found.');
+        }
+        const existingData = (existing.data() ?? {});
+        if (existingData.storeId !== storeId) {
+            throw new functions.https.HttpsError('permission-denied', 'Endpoint does not belong to this store.');
+        }
+    }
+    else {
+        endpointRef = firestore_1.defaultDb.collection('webhookEndpoints').doc();
+    }
+    const endpointPayload = {
+        storeId,
+        url,
+        secret,
+        events,
+        status: 'active',
+        updatedAt: timestamp,
+        revokedAt: null,
+    };
+    if (!endpointId) {
+        endpointPayload.createdAt = timestamp;
+        endpointPayload.createdBy = uid;
+    }
+    await endpointRef.set(endpointPayload, { merge: true });
+    await firestore_1.defaultDb.collection('integrationAuditLogs').add({
+        storeId,
+        action: endpointId ? 'webhook.updated' : 'webhook.created',
+        actorUid: uid,
+        targetId: endpointRef.id,
+        metadata: { url, events },
+        createdAt: timestamp,
+    });
+    return {
+        endpoint: {
+            id: endpointRef.id,
+            url,
+            events,
+            status: 'active',
+        },
+    };
+});
+exports.revokeWebhookEndpoint = functions.https.onCall(async (data, context) => {
+    assertOwnerAccess(context);
+    const uid = context.auth.uid;
+    const storeId = await resolveStaffStoreId(uid);
+    await verifyOwnerForStore(uid, storeId);
+    const endpointId = normalizeWebhookEndpointId(data?.endpointId);
+    const endpointRef = firestore_1.defaultDb.collection('webhookEndpoints').doc(endpointId);
+    const endpointSnapshot = await endpointRef.get();
+    if (!endpointSnapshot.exists) {
+        throw new functions.https.HttpsError('not-found', 'Webhook endpoint not found.');
+    }
+    const endpointData = (endpointSnapshot.data() ?? {});
+    if (endpointData.storeId !== storeId) {
+        throw new functions.https.HttpsError('permission-denied', 'Endpoint does not belong to this store.');
+    }
+    const timestamp = firestore_1.admin.firestore.FieldValue.serverTimestamp();
+    await endpointRef.set({
+        status: 'revoked',
+        revokedAt: timestamp,
+        updatedAt: timestamp,
+        revokedBy: uid,
+    }, { merge: true });
+    await firestore_1.defaultDb.collection('integrationAuditLogs').add({
+        storeId,
+        action: 'webhook.revoked',
+        actorUid: uid,
+        targetId: endpointId,
+        createdAt: timestamp,
+    });
+    return { ok: true, endpointId };
 });
 /** ============================================================================
  *  CALLABLES: TikTok OAuth connect (owner)
@@ -3299,6 +3482,35 @@ exports.v1IntegrationAvailability = functions.https.onRequest(async (req, res) =
         slots,
     });
 });
+async function resolveIntegrationBookingServiceId(options) {
+    const { storeId, payload } = options;
+    const explicitServiceId = toTrimmedStringOrNull(payload.serviceId) ??
+        toTrimmedStringOrNull(payload.serviceID) ??
+        toTrimmedStringOrNull(payload.service_id);
+    if (explicitServiceId)
+        return explicitServiceId;
+    const slotId = toTrimmedStringOrNull(payload.slotId) ??
+        toTrimmedStringOrNull(payload.slotID) ??
+        toTrimmedStringOrNull(payload.slot_id);
+    if (slotId) {
+        const slotSnapshot = await firestore_1.defaultDb
+            .collection('stores')
+            .doc(storeId)
+            .collection('serviceAvailability')
+            .doc(slotId)
+            .get();
+        if (slotSnapshot.exists) {
+            const slotData = (slotSnapshot.data() ?? {});
+            const slotServiceId = toTrimmedStringOrNull(slotData.serviceId);
+            if (slotServiceId)
+                return slotServiceId;
+        }
+    }
+    const defaultServiceId = BOOKING_DEFAULT_SERVICE_ID.value()?.trim() || '';
+    if (defaultServiceId)
+        return defaultServiceId;
+    return null;
+}
 exports.v1IntegrationBookings = functions.https.onRequest(async (req, res) => {
     setIntegrationResponseHeaders(res);
     if (!validateIntegrationContractVersionOrReply(req, res)) {
@@ -3371,12 +3583,20 @@ exports.v1IntegrationBookings = functions.https.onRequest(async (req, res) => {
         return;
     }
     const payload = toPlainObject(req.body);
-    const serviceId = toTrimmedStringOrNull(payload.serviceId);
+    const serviceId = await resolveIntegrationBookingServiceId({
+        storeId: authContext.storeId,
+        payload,
+    });
     if (!serviceId) {
-        res.status(400).json({ error: 'missing-service-id' });
+        res.status(400).json({
+            error: 'service-not-resolved',
+            message: 'Service could not be resolved. Configure BOOKING_DEFAULT_SERVICE_ID or provide serviceId.',
+        });
         return;
     }
-    const slotId = toTrimmedStringOrNull(payload.slotId);
+    const slotId = toTrimmedStringOrNull(payload.slotId) ??
+        toTrimmedStringOrNull(payload.slotID) ??
+        toTrimmedStringOrNull(payload.slot_id);
     const quantityRaw = toFiniteNumber(payload.quantity, 1);
     const quantity = Math.max(1, Math.floor(quantityRaw));
     const customer = toPlainObject(payload.customer);
@@ -3966,6 +4186,14 @@ function computeWebhookSignature(secret, payload) {
     const digest = crypto.createHmac('sha256', secret).update(payload).digest('hex');
     return `sha256=${digest}`;
 }
+function shouldDeliverWebhookEvent(endpointEventsRaw, eventType) {
+    if (!Array.isArray(endpointEventsRaw) || endpointEventsRaw.length === 0)
+        return true;
+    const endpointEvents = endpointEventsRaw
+        .map(value => (typeof value === 'string' ? value.trim().toLowerCase() : ''))
+        .filter(Boolean);
+    return endpointEvents.includes(eventType.toLowerCase());
+}
 const PRODUCT_CATEGORY_RULES = [
     { category: 'Beverages', keywords: ['drink', 'juice', 'soda', 'water', 'coffee', 'tea'] },
     { category: 'Snacks', keywords: ['chips', 'biscuit', 'cookie', 'cracker', 'chocolate'] },
@@ -4404,6 +4632,9 @@ exports.emitProductWebhooks = functions.firestore
         return;
     const results = await Promise.all(endpointSnapshot.docs.map(async (endpointDoc) => {
         const endpoint = endpointDoc.data();
+        if (!shouldDeliverWebhookEvent(endpoint.events, eventType)) {
+            return { endpointId: endpointDoc.id, ok: true, statusCode: 204, error: 'event filtered' };
+        }
         const url = typeof endpoint.url === 'string' ? endpoint.url.trim() : '';
         const secret = typeof endpoint.secret === 'string' ? endpoint.secret : '';
         if (!url || !secret) {
@@ -4442,6 +4673,110 @@ exports.emitProductWebhooks = functions.firestore
         endpointId: result.endpointId,
         eventType,
         productId,
+        eventId: `evt_${context.eventId}`,
+        ok: result.ok,
+        statusCode: result.statusCode,
+        error: result.error,
+        createdAt: firestore_1.admin.firestore.FieldValue.serverTimestamp(),
+    })));
+});
+exports.emitBookingWebhooks = functions.firestore
+    .document('stores/{storeId}/integrationBookings/{bookingId}')
+    .onWrite(async (change, context) => {
+    const beforeExists = change.before.exists;
+    const afterExists = change.after.exists;
+    if (!beforeExists && !afterExists)
+        return;
+    const storeId = typeof context.params.storeId === 'string' ? context.params.storeId.trim() : '';
+    if (!storeId)
+        return;
+    const bookingId = typeof context.params.bookingId === 'string' ? context.params.bookingId.trim() : '';
+    if (!bookingId)
+        return;
+    const beforeData = (beforeExists ? change.before.data() : null);
+    const afterData = (afterExists ? change.after.data() : null);
+    const beforeStatus = toTrimmedStringOrNull(beforeData?.status)?.toLowerCase() ?? null;
+    const afterStatus = toTrimmedStringOrNull(afterData?.status)?.toLowerCase() ?? null;
+    let eventType = 'booking.updated';
+    if (!beforeExists && afterExists) {
+        eventType = 'booking.created';
+    }
+    else if (beforeExists && !afterExists) {
+        eventType = 'booking.cancelled';
+    }
+    else if (beforeStatus !== afterStatus) {
+        if (afterStatus === 'cancelled' || afterStatus === 'canceled') {
+            eventType = 'booking.cancelled';
+        }
+        else if (afterStatus === 'approved') {
+            eventType = 'booking.approved';
+        }
+        else if (afterStatus === 'confirmed') {
+            eventType = 'booking.confirmed';
+        }
+    }
+    const payloadObject = {
+        id: `evt_${context.eventId}`,
+        type: eventType,
+        occurredAt: new Date().toISOString(),
+        storeId,
+        data: {
+            bookingId,
+            before: beforeData,
+            after: afterData,
+        },
+    };
+    const payload = JSON.stringify(payloadObject);
+    const endpointSnapshot = await firestore_1.defaultDb
+        .collection('webhookEndpoints')
+        .where('storeId', '==', storeId)
+        .where('status', '==', 'active')
+        .get();
+    if (endpointSnapshot.empty)
+        return;
+    const results = await Promise.all(endpointSnapshot.docs.map(async (endpointDoc) => {
+        const endpoint = endpointDoc.data();
+        if (!shouldDeliverWebhookEvent(endpoint.events, eventType)) {
+            return { endpointId: endpointDoc.id, ok: true, statusCode: 204, error: 'event filtered' };
+        }
+        const url = typeof endpoint.url === 'string' ? endpoint.url.trim() : '';
+        const secret = typeof endpoint.secret === 'string' ? endpoint.secret : '';
+        if (!url || !secret) {
+            return { endpointId: endpointDoc.id, ok: false, statusCode: null, error: 'missing config' };
+        }
+        const signature = computeWebhookSignature(secret, payload);
+        try {
+            const response = await fetch(url, {
+                method: 'POST',
+                headers: {
+                    'content-type': 'application/json',
+                    'x-sedifex-signature': signature,
+                    'x-sedifex-event': eventType,
+                    'x-sedifex-event-id': `evt_${context.eventId}`,
+                },
+                body: payload,
+            });
+            return {
+                endpointId: endpointDoc.id,
+                ok: response.ok,
+                statusCode: response.status,
+                error: null,
+            };
+        }
+        catch (error) {
+            return {
+                endpointId: endpointDoc.id,
+                ok: false,
+                statusCode: null,
+                error: error instanceof Error ? error.message : 'unknown error',
+            };
+        }
+    }));
+    await Promise.all(results.map(result => firestore_1.defaultDb.collection('webhookDeliveries').add({
+        storeId,
+        endpointId: result.endpointId,
+        eventType,
+        bookingId,
         eventId: `evt_${context.eventId}`,
         ok: result.ok,
         statusCode: result.statusCode,
