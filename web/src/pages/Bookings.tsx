@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react'
 import {
   collection,
+  deleteDoc,
   doc,
   getDocs,
   limit,
@@ -351,6 +352,32 @@ export default function Bookings() {
     [storeId],
   )
 
+
+
+  const handleDeleteBooking = useCallback(
+    async (bookingId: string) => {
+      if (!storeId) return
+      const shouldDelete = window.confirm('Delete this booking? This cannot be undone.')
+      if (!shouldDelete) return
+
+      setUpdatingBookingId(bookingId)
+      setErrorMessage(null)
+
+      try {
+        await deleteDoc(doc(db, 'stores', storeId, 'integrationBookings', bookingId))
+
+        setBookings(previous => previous.filter(booking => booking.id !== bookingId))
+        setSelectedBookingId(previous => (previous === bookingId ? null : previous))
+      } catch (error) {
+        console.error('[bookings] Failed to delete booking', error)
+        setErrorMessage('Delete failed. Please retry.')
+      } finally {
+        setUpdatingBookingId(null)
+      }
+    },
+    [storeId],
+  )
+
   const filteredBookings = useMemo(() => {
     const queryText = searchTerm.trim().toLowerCase()
     if (!queryText) return bookings
@@ -490,8 +517,16 @@ export default function Bookings() {
                                   {action.label}
                                 </button>
                               ))}
+                              <button
+                                className="btn btn-secondary"
+                                type="button"
+                                disabled={updatingBookingId === booking.id}
+                                onClick={() => void handleDeleteBooking(booking.id)}
+                              >
+                                Delete
+                              </button>
                               {!ACTIONABLE_STATUS.includes(booking.status as (typeof ACTIONABLE_STATUS)[number]) && (
-                                <span className="form__hint">No actions</span>
+                                <span className="form__hint">No status actions</span>
                               )}
                             </div>
                           </td>
