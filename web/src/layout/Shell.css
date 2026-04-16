@@ -290,6 +290,43 @@ body.shell--menu-open {
   justify-content: flex-end;
 }
 
+.shell__store-switcher {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  border-radius: 999px;
+  border: 1px solid #cbd5e1;
+  background: #f8fafc;
+}
+
+.shell__store-label {
+  font-size: 12px;
+  font-weight: 700;
+  color: #475569;
+}
+
+.shell__store-select {
+  min-width: 150px;
+  border: 1px solid #cbd5e1;
+  border-radius: 999px;
+  padding: 6px 10px;
+  background: #ffffff;
+  color: #0f172a;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.shell__store-select[data-readonly] {
+  border-style: dashed;
+}
+
+.shell__store-link-hint {
+  margin: 0;
+  font-size: 12px;
+  color: #475569;
+}
+
 .shell__resume-banner {
   display: inline-flex;
   align-items: center;
