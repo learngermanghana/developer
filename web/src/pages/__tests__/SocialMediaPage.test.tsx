@@ -39,6 +39,8 @@ vi.mock('../../firebase', () => ({
 }))
 
 describe('SocialMediaPage manual flow', () => {
+  const openSpy = vi.spyOn(window, 'open').mockImplementation(() => null)
+
   beforeEach(() => {
     mockUseActiveStore.mockReset()
     mockPublish.mockReset()
@@ -104,6 +106,7 @@ describe('SocialMediaPage manual flow', () => {
         disclaimer: null,
       },
     })
+    openSpy.mockClear()
   })
 
   it('renders phone contact details in the draft area without CTA label text', async () => {
@@ -189,5 +192,17 @@ describe('SocialMediaPage manual flow', () => {
     expect(screen.queryByText(/^Caption:/i)).not.toBeInTheDocument()
     expect(screen.queryByText(/^Hashtags:/i)).not.toBeInTheDocument()
     expect(screen.getByRole('button', { name: /download image/i })).toBeEnabled()
+  })
+
+  it('opens instagram when send button is used', async () => {
+    const user = userEvent.setup()
+    const clipboardSpy = vi.spyOn(navigator.clipboard, 'writeText').mockResolvedValueOnce()
+    render(<SocialMediaPage />)
+
+    await user.click(screen.getByRole('button', { name: /generate social post/i }))
+    await user.click(await screen.findByRole('button', { name: /send to instagram/i }))
+
+    expect(openSpy).toHaveBeenCalledWith('https://www.instagram.com/', '_blank', 'noopener,noreferrer')
+    expect(clipboardSpy).toHaveBeenCalledWith(expect.stringContaining('Try our Zobo Mix today'))
   })
 })
