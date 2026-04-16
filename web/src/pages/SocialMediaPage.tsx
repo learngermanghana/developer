@@ -22,6 +22,7 @@ type RegenerateTarget = 'all' | 'caption' | 'hashtags'
 type CopyTarget = 'caption' | 'hashtags' | 'full'
 type ContentTone = 'standard' | 'playful' | 'professional'
 type ContentLength = 'short' | 'medium' | 'long'
+type LaunchPlatformTarget = 'instagram' | 'tiktok'
 type SocialHistoryEntry = {
   id: string
   createdAtIso: string
@@ -511,6 +512,28 @@ export default function SocialMediaPage() {
     publish({ tone: 'success', message: 'Opened image in a new tab. Long-press or right-click to save it.' })
   }
 
+  async function handleSendToPlatform(target: LaunchPlatformTarget) {
+    if (!result) return
+
+    const fullText = [result.post.caption, contactCta, result.post.hashtags.join(' ')].filter(Boolean).join('\n\n')
+
+    try {
+      await navigator.clipboard.writeText(fullText)
+      publish({
+        tone: 'success',
+        message: `Draft copied. Paste it in ${target === 'instagram' ? 'Instagram' : 'TikTok'} after uploading the image.`,
+      })
+    } catch (_error) {
+      publish({
+        tone: 'error',
+        message: 'Could not copy draft automatically. You can still copy manually below.',
+      })
+    }
+
+    const destination = target === 'instagram' ? 'https://www.instagram.com/' : 'https://www.tiktok.com/upload?lang=en'
+    window.open(destination, '_blank', 'noopener,noreferrer')
+  }
+
   function handleDownload() {
     if (!result) return
     const body = [
@@ -667,8 +690,14 @@ export default function SocialMediaPage() {
                 </a>
               </p>
             ) : null}
-            <p style={{ margin: 0, fontSize: 13, opacity: 0.8 }}>Step 1: Download image. Step 2: Upload on Instagram/TikTok app. Step 3: Paste caption + hashtags.</p>
+            <p style={{ margin: 0, fontSize: 13, opacity: 0.8 }}>Step 1: Download image. Step 2: Use Send to Instagram/TikTok (or open app manually). Step 3: Paste caption + hashtags.</p>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+              <button type="button" className="button secondary" onClick={() => void handleSendToPlatform('instagram')}>
+                Send to Instagram
+              </button>
+              <button type="button" className="button secondary" onClick={() => void handleSendToPlatform('tiktok')}>
+                Send to TikTok
+              </button>
               <button type="button" className="button secondary" onClick={() => void handleCopy('caption')}>Copy caption</button>
               <button type="button" className="button secondary" onClick={() => void handleCopy('hashtags')}>Copy hashtags</button>
               <button type="button" className="button secondary" onClick={() => void handleCopy('full')}>Copy full draft</button>
