@@ -4002,6 +4002,64 @@ function sanitizeBookingAttributes(raw: Record<string, unknown>): SanitizedBooki
   }
 }
 
+function formatDateParts(year: number, month: number, day: number): string {
+  return `${String(year).padStart(4, '0')}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`
+}
+
+function normalizeBookingDateForSheet(value: string | null): string | null {
+  if (!value) return null
+  const trimmed = value.trim()
+  if (!trimmed) return null
+
+  const isoMatch = trimmed.match(/^(\d{4})-(\d{2})-(\d{2})$/)
+  if (isoMatch) {
+    const [, yearRaw, monthRaw, dayRaw] = isoMatch
+    const year = Number(yearRaw)
+    const month = Number(monthRaw)
+    const day = Number(dayRaw)
+    const date = new Date(Date.UTC(year, month - 1, day))
+    if (
+      date.getUTCFullYear() === year &&
+      date.getUTCMonth() + 1 === month &&
+      date.getUTCDate() === day
+    ) {
+      return formatDateParts(year, month, day)
+    }
+    return null
+  }
+
+  const parsed = new Date(trimmed)
+  if (!Number.isFinite(parsed.getTime())) {
+    return null
+  }
+
+  return formatDateParts(parsed.getFullYear(), parsed.getMonth() + 1, parsed.getDate())
+}
+
+function normalizeBookingTimeForSheet(value: string | null): string | null {
+  if (!value) return null
+  const trimmed = value.trim()
+  if (!trimmed) return null
+
+  const twentyFourHourMatch = trimmed.match(/^([01]?\d|2[0-3]):([0-5]\d)(?::[0-5]\d)?$/)
+  if (twentyFourHourMatch) {
+    const [, hourRaw, minuteRaw] = twentyFourHourMatch
+    return `${String(Number(hourRaw)).padStart(2, '0')}:${minuteRaw}`
+  }
+
+  const meridiemMatch = trimmed.match(/^([1-9]|1[0-2])(?::([0-5]\d))?\s*([ap]m)$/i)
+  if (meridiemMatch) {
+    const [, hourRaw, minuteRaw, meridiemRaw] = meridiemMatch
+    const hour = Number(hourRaw)
+    const minute = minuteRaw ?? '00'
+    const meridiem = meridiemRaw.toLowerCase()
+    const normalizedHour = meridiem === 'pm' ? (hour === 12 ? 12 : hour + 12) : hour === 12 ? 0 : hour
+    return `${String(normalizedHour).padStart(2, '0')}:${minute}`
+  }
+
+  return null
+}
+
 type IntegrationAvailabilitySlot = {
   id: string
   storeId: string
@@ -5094,7 +5152,7 @@ export const v1IntegrationBookings = functions.https.onRequest(async (req, res) 
     }
     return null
   }
-  const bookingDate = pickBookingString(
+  const bookingDateRaw = pickBookingString(
     pickBookingValueFromAliases({
       aliases: bookingConfig.aliases.bookingDate,
       lookups: [payloadLookup, attributesLookup],
@@ -5104,7 +5162,7 @@ export const v1IntegrationBookings = functions.https.onRequest(async (req, res) 
     payloadAttributes.date,
     payloadAttributes.bookingDate,
   )
-  const bookingTime = pickBookingString(
+  const bookingTimeRaw = pickBookingString(
     pickBookingValueFromAliases({
       aliases: bookingConfig.aliases.bookingTime,
       lookups: [payloadLookup, attributesLookup],
@@ -5114,6 +5172,8 @@ export const v1IntegrationBookings = functions.https.onRequest(async (req, res) 
     payloadAttributes.time,
     payloadAttributes.bookingTime,
   )
+  const bookingDate = normalizeBookingDateForSheet(bookingDateRaw) ?? bookingDateRaw
+  const bookingTime = normalizeBookingTimeForSheet(bookingTimeRaw) ?? bookingTimeRaw
   const branchLocationId = pickBookingString(
     pickBookingValueFromAliases({
       aliases: bookingConfig.aliases.branchLocationId,
@@ -7975,4 +8035,6 @@ export const __testing = {
   buildBookingValueLookup,
   pickBookingValueFromAliases,
   sanitizeBookingAttributes,
+  normalizeBookingDateForSheet,
+  normalizeBookingTimeForSheet,
 }
