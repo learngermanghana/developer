@@ -82,6 +82,21 @@ function runSanitizeTests(testing) {
   assert.strictEqual(result.meta.totalStored, 3)
 }
 
+function runDateFormattingTests(testing) {
+  assert.strictEqual(testing.normalizeBookingDateForSheet('2026-04-29'), '2026-04-29')
+  assert.strictEqual(testing.normalizeBookingDateForSheet('April 29, 2026'), '2026-04-29')
+  assert.strictEqual(testing.normalizeBookingDateForSheet(''), null)
+  assert.strictEqual(testing.normalizeBookingDateForSheet('2026-02-30'), null)
+}
+
+function runTimeFormattingTests(testing) {
+  assert.strictEqual(testing.normalizeBookingTimeForSheet('19:00'), '19:00')
+  assert.strictEqual(testing.normalizeBookingTimeForSheet('7pm'), '19:00')
+  assert.strictEqual(testing.normalizeBookingTimeForSheet('7:05 PM'), '19:05')
+  assert.strictEqual(testing.normalizeBookingTimeForSheet('12am'), '00:00')
+  assert.strictEqual(testing.normalizeBookingTimeForSheet(''), null)
+}
+
 function run() {
   const module = loadFunctionsModule()
   assert.ok(module.__testing, 'Expected __testing exports')
@@ -89,6 +104,8 @@ function run() {
   runCanonicalKeyTests(module.__testing)
   runLookupTests(module.__testing)
   runSanitizeTests(module.__testing)
+  runDateFormattingTests(module.__testing)
+  runTimeFormattingTests(module.__testing)
 }
 
 run()
