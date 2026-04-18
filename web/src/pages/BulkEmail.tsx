@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { collection, limit, onSnapshot, orderBy, query, where } from 'firebase/firestore'
+import { collection, doc, getDoc, limit, onSnapshot, orderBy, query, where } from 'firebase/firestore'
 import PageSection from '../layout/PageSection'
 import { db } from '../firebase'
 import { useActiveStore } from '../hooks/useActiveStore'
@@ -46,6 +46,8 @@ export default function BulkEmail() {
   const [subject, setSubject] = useState('')
   const [html, setHtml] = useState('')
   const [searchTerm, setSearchTerm] = useState('')
+  const [isLoadingIntegration, setIsLoadingIntegration] = useState(false)
+  const [integrationError, setIntegrationError] = useState<string>('')
   const [isSending, setIsSending] = useState(false)
   const [sendStatus, setSendStatus] = useState<string>('')
   const [sendError, setSendError] = useState<string>('')
@@ -55,6 +57,64 @@ export default function BulkEmail() {
     if (!workspaceName) return
     setFromName(prev => (prev ? prev : workspaceName))
   }, [workspaceName])
+
+  useEffect(() => {
+    if (!storeId) {
+      setWebAppUrl('')
+      setSharedToken('')
+      setFromName(workspaceName || 'Sedifex Campaign')
+      return
+    }
+
+    let cancelled = false
+
+    async function loadIntegrationSettings() {
+      setIsLoadingIntegration(true)
+      setIntegrationError('')
+      try {
+        const snapshot = await getDoc(doc(db, 'stores', storeId))
+        if (cancelled) return
+
+        if (!snapshot.exists()) {
+          setIntegrationError('Workspace not found. Open Account → Integrations to reconnect email settings.')
+          return
+        }
+
+        const data = snapshot.data() as Record<string, unknown>
+        const bulkEmailIntegration =
+          data.bulkEmailIntegration && typeof data.bulkEmailIntegration === 'object'
+            ? (data.bulkEmailIntegration as Record<string, unknown>)
+            : {}
+
+        const savedWebAppUrl =
+          typeof bulkEmailIntegration.webAppUrl === 'string' ? bulkEmailIntegration.webAppUrl.trim() : ''
+        const savedSharedToken =
+          typeof bulkEmailIntegration.sharedToken === 'string' ? bulkEmailIntegration.sharedToken.trim() : ''
+        const savedFromName =
+          typeof bulkEmailIntegration.fromName === 'string' ? bulkEmailIntegration.fromName.trim() : ''
+
+        setWebAppUrl(savedWebAppUrl)
+        setSharedToken(savedSharedToken)
+        setFromName(savedFromName || workspaceName || 'Sedifex Campaign')
+
+        if (!savedWebAppUrl || !savedSharedToken) {
+          setIntegrationError('Email integration is incomplete. Open Account → Integrations → Email delivery.')
+        }
+      } catch (error) {
+        if (cancelled) return
+        console.error('[bulk-email] Failed to load email integration settings', error)
+        setIntegrationError('Unable to load email integration settings. Open Account → Integrations.')
+      } finally {
+        if (!cancelled) setIsLoadingIntegration(false)
+      }
+    }
+
+    void loadIntegrationSettings()
+
+    return () => {
+      cancelled = true
+    }
+  }, [storeId, workspaceName])
 
   useEffect(() => {
     if (!storeId) {
@@ -133,11 +193,11 @@ export default function BulkEmail() {
     setSendResult(null)
 
     if (!webAppUrl.trim()) {
-      setSendError('Enter your Google Apps Script Web App URL.')
+      setSendError('Connect your Google Apps Script Web App URL in Account → Integrations → Email delivery.')
       return
     }
     if (!sharedToken.trim()) {
-      setSendError('Enter your shared token.')
+      setSendError('Set your shared token in Account → Integrations → Email delivery.')
       return
     }
     if (!subject.trim()) {
@@ -202,56 +262,128 @@ export default function BulkEmail() {
   return (
     <PageSection
       title="Bulk email"
-      subtitle="Set up your email integration and use Sedifex customer data as the audience source."
+      subtitle="Compose and send your campaign from here. Integration settings are now managed under Account → Integrations."
     >
       <div className="card" style={{ display: 'grid', gap: 16 }}>
         <h3 className="card__title">In-app email composer</h3>
         <p style={{ margin: 0 }}>
-          This composer sends your campaign payload directly to your Google Apps Script Web App URL.
-          Your script handles delivery (and optional queue retries).
+          Write your message here, choose recipients, then send directly to your configured Google Apps Script endpoint.
         </p>
-        <ul>
-          <li>No duplicate customer entry in Google Sheets.</li>
-          <li>Store-owned Google Sheet and Apps Script handle the send step.</li>
-          <li>Sedifex passes campaign payload to your configured Apps Script endpoint.</li>
-        </ul>
-        <p style={{ margin: 0 }}>
-          <strong>Why you do not see a message input here:</strong> this page is currently an
-          integration setup page. The in-app email composer is not available on this screen yet.
-        </p>
+
         <div
           style={{
             border: '1px solid var(--line, #d8deeb)',
             borderRadius: 12,
             padding: 14,
             background: 'var(--panel-muted, #f6f8fd)',
+            display: 'grid',
+            gap: 8,
           }}
         >
-          <h4 style={{ margin: '0 0 8px' }}>How to send right now</h4>
-          <ol style={{ margin: 0, paddingInlineStart: 20, display: 'grid', gap: 6 }}>
-            <li>Open <strong>Account → Integrations</strong> and connect your Google Apps Script URL + token.</li>
-            <li>Keep your customers updated in <strong>Customers</strong> inside Sedifex.</li>
-            <li>
-              Use your Apps Script flow to send with Sedifex payload fields:
-              <code> subject </code>
-              and
-              <code> html </code>
-              (see setup guide).
-            </li>
-          </ol>
+          <p style={{ margin: 0 }}>
+            <strong>Delivery setup:</strong> Account → Integrations → Email delivery.
+          </p>
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+            <Link className="button button--ghost" to="/account">
+              Open integrations
+            </Link>
+            <Link className="button button--ghost" to="/docs/bulk-email-google-sheets-guide">
+              Open setup guide
+            </Link>
+          </div>
+          {isLoadingIntegration ? <p style={{ margin: 0 }}>Loading integration settings…</p> : null}
+          {integrationError ? <p style={{ margin: 0, color: 'var(--danger, #b3261e)' }}>{integrationError}</p> : null}
         </div>
+
+        <div style={{ display: 'grid', gap: 10 }}>
+          <label style={{ display: 'grid', gap: 6 }}>
+            <span>From name</span>
+            <input
+              type="text"
+              value={fromName}
+              onChange={event => setFromName(event.target.value)}
+              placeholder="Sedifex Campaign"
+            />
+          </label>
+          <label style={{ display: 'grid', gap: 6 }}>
+            <span>Email subject</span>
+            <input
+              type="text"
+              value={subject}
+              onChange={event => setSubject(event.target.value)}
+              placeholder="Big weekend offer for loyal customers"
+            />
+          </label>
+          <label style={{ display: 'grid', gap: 6 }}>
+            <span>Email content (HTML or plain text)</span>
+            <textarea
+              rows={8}
+              value={html}
+              onChange={event => setHtml(event.target.value)}
+              placeholder="<h1>Hi {{name}}</h1><p>Thanks for shopping with us...</p>"
+            />
+          </label>
+        </div>
+
+        <div style={{ display: 'grid', gap: 10 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+            <strong>Recipients</strong>
+            <span>
+              {selectedCustomers.length} selected / {emailCustomers.length} with email
+            </span>
+          </div>
+          <label style={{ display: 'grid', gap: 6 }}>
+            <span>Search customers</span>
+            <input
+              type="search"
+              value={searchTerm}
+              onChange={event => setSearchTerm(event.target.value)}
+              placeholder="Search name or email"
+            />
+          </label>
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+            <button type="button" className="button button--secondary" onClick={selectAllFiltered}>
+              Select all filtered
+            </button>
+            <button type="button" className="button button--ghost" onClick={clearSelection}>
+              Clear selection
+            </button>
+          </div>
+          <div style={{ maxHeight: 260, overflow: 'auto', border: '1px solid var(--line, #d8deeb)', borderRadius: 10 }}>
+            {filteredCustomers.length === 0 ? (
+              <p style={{ margin: 0, padding: 12 }}>No customers with email match your search.</p>
+            ) : (
+              <ul style={{ listStyle: 'none', margin: 0, padding: 0 }}>
+                {filteredCustomers.map(customer => {
+                  const isSelected = selectedIds.has(customer.id)
+                  return (
+                    <li key={customer.id} style={{ borderBottom: '1px solid var(--line, #d8deeb)', padding: '10px 12px' }}>
+                      <label style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+                        <input
+                          type="checkbox"
+                          checked={isSelected}
+                          onChange={() => toggleSelect(customer.id)}
+                        />
+                        <span>
+                          <strong>{getCustomerName(customer)}</strong>
+                          <br />
+                          <span>{customer.email?.trim() || 'No email'}</span>
+                        </span>
+                      </label>
+                    </li>
+                  )
+                })}
+              </ul>
+            )}
+          </div>
+        </div>
+
         <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
           <button type="button" className="button button--primary" onClick={handleSend} disabled={isSending}>
             {isSending ? 'Sending…' : 'Send bulk email'}
           </button>
-          <Link className="button button--ghost" to="/docs/bulk-email-google-sheets-guide">
-            Open setup guide
-          </Link>
           <Link className="button button--ghost" to="/customers">
             Manage customers
-          </Link>
-          <Link className="button button--ghost" to="/docs/bulk-email-google-sheets-guide">
-            Open setup guide
           </Link>
         </div>
 

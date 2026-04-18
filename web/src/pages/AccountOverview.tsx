@@ -76,6 +76,9 @@ type StoreProfile = {
   tiktokConnectedAt: Timestamp | null
   promoImageUrl: string | null
   promoImageAlt: string | null
+  bulkEmailWebAppUrl: string | null
+  bulkEmailSharedToken: string | null
+  bulkEmailFromName: string | null
 }
 
 type SubscriptionProfile = {
@@ -226,6 +229,10 @@ function mapStoreSnapshot(
   // ✅ Prefer stores.ownerEmail for billing; fallback to stores.email
   const ownerEmail =
     toNullableString((data as any).ownerEmail) ?? toNullableString(data.email)
+  const bulkEmailRaw =
+    data.bulkEmailIntegration && typeof data.bulkEmailIntegration === 'object'
+      ? (data.bulkEmailIntegration as Record<string, unknown>)
+      : {}
 
   return {
     name: toNullableString(data.name),
@@ -262,6 +269,9 @@ function mapStoreSnapshot(
     tiktokConnectedAt: isTimestamp((data as any).tiktokConnectedAt) ? (data as any).tiktokConnectedAt : null,
     promoImageUrl: toNullableString((data as any).promoImageUrl),
     promoImageAlt: toNullableString((data as any).promoImageAlt),
+    bulkEmailWebAppUrl: toNullableString(bulkEmailRaw.webAppUrl),
+    bulkEmailSharedToken: toNullableString(bulkEmailRaw.sharedToken),
+    bulkEmailFromName: toNullableString(bulkEmailRaw.fromName),
   }
 }
 
@@ -351,7 +361,7 @@ type AccountTab =
   | 'data-controls'
 type PublicPageTab = 'overview' | 'promo' | 'gallery' | 'website-sync'
 type PromoGalleryTab = 'upload' | 'view'
-type IntegrationTab = 'overview' | 'keys' | 'booking' | 'webhooks' | 'tests'
+type IntegrationTab = 'overview' | 'keys' | 'booking' | 'webhooks' | 'email' | 'tests'
 
 export default function AccountOverview({
   headingLevel = 'h1',
@@ -445,6 +455,10 @@ export default function AccountOverview({
   const [webhookSecret, setWebhookSecret] = useState('')
   const [isSavingWebhookEndpoint, setIsSavingWebhookEndpoint] = useState(false)
   const [actioningWebhookEndpointId, setActioningWebhookEndpointId] = useState<string | null>(null)
+  const [bulkEmailWebAppUrl, setBulkEmailWebAppUrl] = useState('')
+  const [bulkEmailSharedToken, setBulkEmailSharedToken] = useState('')
+  const [bulkEmailFromName, setBulkEmailFromName] = useState('')
+  const [isSavingBulkEmailIntegration, setIsSavingBulkEmailIntegration] = useState(false)
   const isPromotionsView = viewMode === 'promotions'
 
   const activeMembership = useMemo(() => {
@@ -457,6 +471,19 @@ export default function AccountOverview({
     () => roster.filter(member => member.status === 'pending'),
     [roster],
   )
+
+  useEffect(() => {
+    if (!profile) {
+      setBulkEmailWebAppUrl('')
+      setBulkEmailSharedToken('')
+      setBulkEmailFromName('')
+      return
+    }
+
+    setBulkEmailWebAppUrl(profile.bulkEmailWebAppUrl ?? '')
+    setBulkEmailSharedToken(profile.bulkEmailSharedToken ?? '')
+    setBulkEmailFromName(profile.bulkEmailFromName ?? profile.displayName ?? profile.name ?? '')
+  }, [profile])
 
   useEffect(() => {
     if (!isPromotionsView) return
@@ -1493,6 +1520,55 @@ export default function AccountOverview({
     }
   }
 
+  async function handleSaveBulkEmailIntegration() {
+    if (!storeId) {
+      publish({ message: 'No store selected for email integration.', tone: 'error' })
+      return
+    }
+    if (!bulkEmailWebAppUrl.trim()) {
+      publish({ message: 'Enter your Google Apps Script Web App URL.', tone: 'error' })
+      return
+    }
+    if (!bulkEmailSharedToken.trim()) {
+      publish({ message: 'Enter your email shared token.', tone: 'error' })
+      return
+    }
+
+    try {
+      setIsSavingBulkEmailIntegration(true)
+      await setDoc(
+        doc(db, 'stores', storeId),
+        {
+          bulkEmailIntegration: {
+            webAppUrl: bulkEmailWebAppUrl.trim(),
+            sharedToken: bulkEmailSharedToken.trim(),
+            fromName: bulkEmailFromName.trim(),
+            updatedAt: serverTimestamp(),
+          },
+          updatedAt: serverTimestamp(),
+        },
+        { merge: true },
+      )
+
+      setProfile(current =>
+        current
+          ? {
+              ...current,
+              bulkEmailWebAppUrl: bulkEmailWebAppUrl.trim(),
+              bulkEmailSharedToken: bulkEmailSharedToken.trim(),
+              bulkEmailFromName: bulkEmailFromName.trim() || null,
+            }
+          : current,
+      )
+      publish({ message: 'Bulk email integration saved.', tone: 'success' })
+    } catch (error) {
+      console.error('[account] Failed to save bulk email integration', error)
+      publish({ message: 'Unable to save bulk email integration.', tone: 'error' })
+    } finally {
+      setIsSavingBulkEmailIntegration(false)
+    }
+  }
+
   async function handleConnectTikTok() {
     if (!storeId) {
       publish({ message: 'No store selected for TikTok connection.', tone: 'error' })
@@ -2082,6 +2158,13 @@ export default function AccountOverview({
               </button>
               <button
                 type="button"
+                className={`account-overview__tab ${integrationTab === 'email' ? 'is-active' : ''}`}
+                onClick={() => setIntegrationTab('email')}
+              >
+                Email delivery
+              </button>
+              <button
+                type="button"
                 className={`account-overview__tab ${integrationTab === 'tests' ? 'is-active' : ''}`}
                 onClick={() => setIntegrationTab('tests')}
               >
@@ -2302,6 +2385,52 @@ export default function AccountOverview({
                     ))}
                   </ul>
                 )}
+              </div>
+            )}
+            {(integrationTab === 'overview' || integrationTab === 'email') && (
+              <div className="account-overview__website-sync-keys">
+                <p className="account-overview__hint">Bulk email delivery integration</p>
+                <p className="account-overview__hint">
+                  Configure this once here. The <Link to="/bulk-email">Bulk Email</Link> page will use these values
+                  when sending campaigns.
+                </p>
+                <div className="account-overview__website-sync-test">
+                  <label>
+                    <span>Google Apps Script Web App URL</span>
+                    <input
+                      type="url"
+                      value={bulkEmailWebAppUrl}
+                      onChange={event => setBulkEmailWebAppUrl(event.target.value)}
+                      placeholder="https://script.google.com/macros/s/.../exec"
+                    />
+                  </label>
+                  <label>
+                    <span>Shared token</span>
+                    <input
+                      type="password"
+                      value={bulkEmailSharedToken}
+                      onChange={event => setBulkEmailSharedToken(event.target.value)}
+                      placeholder="Set the same token in your Apps Script"
+                    />
+                  </label>
+                  <label>
+                    <span>From name (optional)</span>
+                    <input
+                      type="text"
+                      value={bulkEmailFromName}
+                      onChange={event => setBulkEmailFromName(event.target.value)}
+                      placeholder="Sedifex Campaign"
+                    />
+                  </label>
+                  <button
+                    type="button"
+                    className="button button--secondary"
+                    onClick={handleSaveBulkEmailIntegration}
+                    disabled={isSavingBulkEmailIntegration}
+                  >
+                    {isSavingBulkEmailIntegration ? 'Saving…' : 'Save email integration'}
+                  </button>
+                </div>
               </div>
             )}
             {(integrationTab === 'overview' || integrationTab === 'tests') && (
