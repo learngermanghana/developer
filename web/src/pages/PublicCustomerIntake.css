@@ -37,6 +37,11 @@
   font-size: clamp(1.5rem, 4vw, 2rem);
 }
 
+.public-customer-intake--qr .public-customer-intake__headline {
+  color: #0f172a;
+  font-weight: 800;
+}
+
 .public-customer-intake p {
   margin: 0;
   color: #334155;
@@ -120,6 +125,14 @@
 .public-customer-intake__fallback {
   font-size: 0.8rem;
   color: #64748b;
+}
+
+.public-customer-intake__powered-by {
+  margin-top: 0.35rem;
+  text-align: center;
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: #0f172a;
 }
 
 .public-customer-intake--a5 .public-customer-intake__card {
