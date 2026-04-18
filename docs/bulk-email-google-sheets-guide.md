@@ -161,6 +161,80 @@ function doPost(e) {
     errors,
   })).setMimeType(ContentService.MimeType.JSON)
 }
+
+function isDailyLimitError(message) {
+  const text = (message || '').toLowerCase()
+  return text.includes('limit exceeded') || text.includes('quota')
+}
+
+function getOrCreateQueueSheet(ss, queueTabName) {
+  const sheet = ss.getSheetByName(queueTabName) || ss.insertSheet(queueTabName)
+  if (sheet.getLastRow() === 0) {
+    sheet.appendRow([
+      'queued_at',
+      'email',
+      'name',
+      'subject',
+      'html',
+      'from_name',
+      'status',
+      'last_attempt_at',
+      'error',
+    ])
+  }
+  return sheet
+}
+
+function enqueueEmail(ss, queueTabName, item) {
+  const queueSheet = getOrCreateQueueSheet(ss, queueTabName)
+  queueSheet.appendRow([
+    new Date(),
+    item.email || '',
+    item.name || '',
+    item.subject || '',
+    item.html || '',
+    item.fromName || '',
+    'QUEUED',
+    '',
+    item.error || '',
+  ])
+}
+
+/**
+ * Optional: run this with a time-based trigger every 15-60 minutes.
+ * It retries queued emails after daily limits reset.
+ */
+function processEmailQueue() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet()
+  const queueSheet = getOrCreateQueueSheet(ss, 'EmailQueue') // CHANGE ME if renamed
+  const values = queueSheet.getDataRange().getValues()
+  if (values.length <= 1) return
+
+  const data = values.slice(1)
+  data.forEach((row, idx) => {
+    const rowNumber = idx + 2
+    const status = (row[6] || '').toString().trim().toUpperCase()
+    if (status !== 'QUEUED') return
+
+    const email = (row[1] || '').toString().trim()
+    if (!email) return
+
+    try {
+      MailApp.sendEmail({
+        to: email,
+        subject: (row[3] || '').toString(),
+        htmlBody: (row[4] || '').toString(),
+        name: (row[5] || 'Sedifex Campaign').toString(),
+      })
+      queueSheet.getRange(rowNumber, 7).setValue('SENT') // status
+      queueSheet.getRange(rowNumber, 8).setValue(new Date()) // last_attempt_at
+      queueSheet.getRange(rowNumber, 9).setValue('') // error
+    } catch (err) {
+      queueSheet.getRange(rowNumber, 8).setValue(new Date())
+      queueSheet.getRange(rowNumber, 9).setValue(String(err))
+    }
+  })
+}
 ```
 
 ## Payload example from Sedifex
@@ -181,4 +255,5 @@ function doPost(e) {
 ## Important notes
 - Keep customer records in Sedifex only (no duplicate manual entry).
 - Google sending quotas apply.
+- If quota is reached, script can queue unsent emails to `EmailQueue` and retry later with a time-based trigger.
 - Rotate shared tokens when ownership/staff changes.
