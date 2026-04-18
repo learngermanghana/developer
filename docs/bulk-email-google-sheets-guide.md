@@ -36,22 +36,6 @@ Use row 1 as headers:
 | ama@example.com | Ama |  |  | VIP |
 | kojo@example.com | Kojo |  |  | Follow up in May |
 
-### Queue tab (for daily-limit overflow)
-Add another tab for queued retries:
-- **Tab name:** `EmailQueue` *(change in script if needed)*
-
-| Column | Header | Purpose |
-|---|---|---|
-| A | `queued_at` | When message was queued |
-| B | `email` | Recipient email |
-| C | `name` | Recipient name (optional) |
-| D | `subject` | Email subject |
-| E | `html` | Email HTML body |
-| F | `from_name` | Sender display name |
-| G | `status` | `QUEUED`, `SENT`, or `ERROR` |
-| H | `last_attempt_at` | Last retry time |
-| I | `error` | Last error message |
-
 ## Where the topic and message go
 - **Topic (email subject):** set in Sedifex campaign **Subject** field. It is sent as `payload.subject`.
 - **Message (email body):** set in Sedifex campaign **Message** editor. It is sent as `payload.html`.
@@ -78,7 +62,6 @@ function doPost(e) {
   // CHANGE ME: update these if your tab name or column layout is different.
   const CONFIG = {
     sheetTabName: 'Recipients', // CHANGE ME
-    queueTabName: 'EmailQueue', // CHANGE ME
     headers: {
       email: 'email',           // CHANGE ME
       name: 'name',             // CHANGE ME
@@ -163,25 +146,9 @@ function doPost(e) {
         sheet.getRange(recipient.rowIndex, lastSentAtCol + 1).setValue(new Date())
       }
     } catch (err) {
-      const message = String(err)
-      errors.push({ email, message })
-
-      // Queue when daily send limit/quota is reached.
-      if (isDailyLimitError(message)) {
-        enqueueEmail(ss, CONFIG.queueTabName, {
-          email,
-          name: recipient.name || '',
-          subject: payload.subject || 'Update from your store',
-          html: payload.html || '',
-          fromName: payload.fromName || 'Sedifex Campaign',
-          error: message,
-        })
-      }
-
+      errors.push({ email, message: String(err) })
       if (recipient.rowIndex && statusCol >= 0) {
-        sheet
-          .getRange(recipient.rowIndex, statusCol + 1)
-          .setValue(isDailyLimitError(message) ? 'QUEUED' : 'ERROR')
+        sheet.getRange(recipient.rowIndex, statusCol + 1).setValue('ERROR')
       }
     }
   })
@@ -191,7 +158,6 @@ function doPost(e) {
     attempted,
     sent,
     failed: attempted - sent,
-    queuedForRetry: errors.filter((e) => isDailyLimitError(e.message)).length,
     errors,
   })).setMimeType(ContentService.MimeType.JSON)
 }

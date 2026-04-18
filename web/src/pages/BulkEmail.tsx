@@ -202,7 +202,7 @@ export default function BulkEmail() {
   return (
     <PageSection
       title="Bulk email"
-      subtitle="Compose your campaign in Sedifex, select recipients, and send to your Google Apps Script endpoint."
+      subtitle="Set up your email integration and use Sedifex customer data as the audience source."
     >
       <div className="card" style={{ display: 'grid', gap: 16 }}>
         <h3 className="card__title">In-app email composer</h3>
@@ -210,117 +210,36 @@ export default function BulkEmail() {
           This composer sends your campaign payload directly to your Google Apps Script Web App URL.
           Your script handles delivery (and optional queue retries).
         </p>
-
-        <label className="field">
-          <span>Apps Script Web App URL</span>
-          <input
-            value={webAppUrl}
-            onChange={event => setWebAppUrl(event.target.value)}
-            placeholder="https://script.google.com/macros/s/.../exec"
-            autoComplete="off"
-          />
-        </label>
-
-        <label className="field">
-          <span>Shared token</span>
-          <input
-            value={sharedToken}
-            onChange={event => setSharedToken(event.target.value)}
-            placeholder="Same value as SEDIFEX_SHARED_TOKEN in Apps Script properties"
-            autoComplete="off"
-          />
-        </label>
-
-        <div style={{ display: 'grid', gap: 10, gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))' }}>
-          <label className="field">
-            <span>From name</span>
-            <input value={fromName} onChange={event => setFromName(event.target.value)} />
-          </label>
-          <label className="field">
-            <span>Subject</span>
-            <input
-              value={subject}
-              onChange={event => setSubject(event.target.value)}
-              placeholder="Weekend promo just for you"
-            />
-          </label>
-        </div>
-
-        <label className="field">
-          <span>Message (HTML allowed)</span>
-          <textarea
-            value={html}
-            onChange={event => setHtml(event.target.value)}
-            rows={8}
-            placeholder="<p>Hello {{name}}, enjoy 10% off this weekend.</p>"
-          />
-        </label>
-
+        <ul>
+          <li>No duplicate customer entry in Google Sheets.</li>
+          <li>Store-owned Google Sheet and Apps Script handle the send step.</li>
+          <li>Sedifex passes campaign payload to your configured Apps Script endpoint.</li>
+        </ul>
+        <p style={{ margin: 0 }}>
+          <strong>Why you do not see a message input here:</strong> this page is currently an
+          integration setup page. The in-app email composer is not available on this screen yet.
+        </p>
         <div
           style={{
             border: '1px solid var(--line, #d8deeb)',
             borderRadius: 12,
-            padding: 12,
-            display: 'grid',
-            gap: 10,
+            padding: 14,
+            background: 'var(--panel-muted, #f6f8fd)',
           }}
         >
-          <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, flexWrap: 'wrap' }}>
-            <strong>Recipients</strong>
-            <span>
-              {selectedCustomers.length} selected / {emailCustomers.length} with email
-            </span>
-          </div>
-
-          <label className="field">
-            <span>Search customers</span>
-            <input
-              value={searchTerm}
-              onChange={event => setSearchTerm(event.target.value)}
-              placeholder="Search by name or email"
-            />
-          </label>
-
-          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-            <button type="button" className="button button--ghost" onClick={selectAllFiltered}>
-              Select filtered
-            </button>
-            <button type="button" className="button button--ghost" onClick={clearSelection}>
-              Clear selection
-            </button>
-          </div>
-
-          <div style={{ maxHeight: 260, overflow: 'auto', border: '1px solid var(--line, #e3e8f5)', borderRadius: 10 }}>
-            {filteredCustomers.length ? (
-              filteredCustomers.map(customer => {
-                const isChecked = selectedIds.has(customer.id)
-                return (
-                  <label
-                    key={customer.id}
-                    style={{
-                      display: 'grid',
-                      gridTemplateColumns: 'auto 1fr',
-                      gap: 10,
-                      padding: '10px 12px',
-                      borderBottom: '1px solid var(--line, #f0f3fa)',
-                      background: isChecked ? 'var(--panel-muted, #f6f8fd)' : 'transparent',
-                    }}
-                  >
-                    <input type="checkbox" checked={isChecked} onChange={() => toggleSelect(customer.id)} />
-                    <span>
-                      <strong>{getCustomerName(customer)}</strong>
-                      <br />
-                      <small>{customer.email}</small>
-                    </span>
-                  </label>
-                )
-              })
-            ) : (
-              <p style={{ margin: 0, padding: 12 }}>No customers with email match this search.</p>
-            )}
-          </div>
+          <h4 style={{ margin: '0 0 8px' }}>How to send right now</h4>
+          <ol style={{ margin: 0, paddingInlineStart: 20, display: 'grid', gap: 6 }}>
+            <li>Open <strong>Account → Integrations</strong> and connect your Google Apps Script URL + token.</li>
+            <li>Keep your customers updated in <strong>Customers</strong> inside Sedifex.</li>
+            <li>
+              Use your Apps Script flow to send with Sedifex payload fields:
+              <code> subject </code>
+              and
+              <code> html </code>
+              (see setup guide).
+            </li>
+          </ol>
         </div>
-
         <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
           <button type="button" className="button button--primary" onClick={handleSend} disabled={isSending}>
             {isSending ? 'Sending…' : 'Send bulk email'}
@@ -330,6 +249,9 @@ export default function BulkEmail() {
           </Link>
           <Link className="button button--ghost" to="/customers">
             Manage customers
+          </Link>
+          <Link className="button button--ghost" to="/docs/bulk-email-google-sheets-guide">
+            Open setup guide
           </Link>
         </div>
 
