@@ -16,7 +16,39 @@ Use this guide when each store should own its Google Sheet and Apps Script deplo
 5. In Sedifex, open **Account → Integrations → Bulk Email (Google Sheets)**.
 6. Paste Web App URL + shared token, then verify connection.
 
-## Apps Script sample (starter)
+## Sheet template (what the store should create)
+Create one tab with this exact name:
+- **Tab name:** `Recipients` *(change this in script if you use another name)*
+
+Use row 1 as headers:
+
+| Column | Header | What to put there |
+|---|---|---|
+| A | `email` | Customer email address (required) |
+| B | `name` | Customer name (optional) |
+| C | `status` | Leave blank. Script writes `SENT`, `SKIPPED`, or `ERROR`. |
+| D | `last_sent_at` | Leave blank. Script writes timestamp after send. |
+| E | `notes` | Optional internal notes. |
+
+### Sample rows
+| email | name | status | last_sent_at | notes |
+|---|---|---|---|---|
+| ama@example.com | Ama |  |  | VIP |
+| kojo@example.com | Kojo |  |  | Follow up in May |
+
+## Where the topic and message go
+- **Topic (email subject):** set in Sedifex campaign **Subject** field. It is sent as `payload.subject`.
+- **Message (email body):** set in Sedifex campaign **Message** editor. It is sent as `payload.html`.
+- The sheet is mainly for recipients (`email`, optional `name`) and delivery tracking (`status`, `last_sent_at`).
+- In the script, these are used here:
+  - `subject: payload.subject || 'Update from your store'`
+  - `htmlBody: payload.html || ''`
+
+If you want to type subject/body in Google Sheets instead, add columns like `subject` and `message_html`, then replace `payload.subject` and `payload.html` with those cell values.
+
+## Apps Script sample (starter, with CHANGE ME markers)
+> Paste this into **Extensions → Apps Script**. If needed, change the values under `CONFIG` to match your own sheet/tab/columns.
+
 ```javascript
 function doPost(e) {
   const payload = JSON.parse(e.postData.contents || '{}')
@@ -27,26 +59,106 @@ function doPost(e) {
       .setMimeType(ContentService.MimeType.JSON)
   }
 
-  const recipients = Array.isArray(payload.recipients) ? payload.recipients : []
+  // CHANGE ME: update these if your tab name or column layout is different.
+  const CONFIG = {
+    sheetTabName: 'Recipients', // CHANGE ME
+    headers: {
+      email: 'email',           // CHANGE ME
+      name: 'name',             // CHANGE ME
+      status: 'status',         // CHANGE ME
+      lastSentAt: 'last_sent_at' // CHANGE ME
+    }
+  }
+
+  const recipientsFromPayload = Array.isArray(payload.recipients) ? payload.recipients : []
+  const ss = SpreadsheetApp.getActiveSpreadsheet()
+  const sheet = ss.getSheetByName(CONFIG.sheetTabName)
+
+  if (!sheet) {
+    return ContentService.createTextOutput(JSON.stringify({
+      ok: false,
+      error: `sheet tab not found: ${CONFIG.sheetTabName}`,
+    })).setMimeType(ContentService.MimeType.JSON)
+  }
+
+  const values = sheet.getDataRange().getValues()
+  if (!values.length) {
+    return ContentService.createTextOutput(JSON.stringify({ ok: false, error: 'sheet is empty' }))
+      .setMimeType(ContentService.MimeType.JSON)
+  }
+
+  const headers = values[0].map((h) => (h || '').toString().trim().toLowerCase())
+  const emailCol = headers.indexOf(CONFIG.headers.email.toLowerCase())
+  const nameCol = headers.indexOf(CONFIG.headers.name.toLowerCase())
+  const statusCol = headers.indexOf(CONFIG.headers.status.toLowerCase())
+  const lastSentAtCol = headers.indexOf(CONFIG.headers.lastSentAt.toLowerCase())
+
+  if (emailCol < 0) {
+    return ContentService.createTextOutput(JSON.stringify({
+      ok: false,
+      error: `missing required header: ${CONFIG.headers.email}`,
+    })).setMimeType(ContentService.MimeType.JSON)
+  }
+
+  let attempted = 0
   let sent = 0
+  const errors = []
 
-  recipients.forEach((row) => {
-    const email = (row?.email || '').toString().trim()
-    if (!email) return
+  // Priority: use Sedifex payload recipients if provided; otherwise fall back to sheet rows.
+  const sheetRows = values.slice(1).map((row, i) => ({
+    rowIndex: i + 2,
+    email: (row[emailCol] || '').toString().trim(),
+    name: nameCol >= 0 ? (row[nameCol] || '').toString().trim() : '',
+  }))
 
-    MailApp.sendEmail({
-      to: email,
-      subject: payload.subject || 'Update from your store',
-      htmlBody: payload.html || '',
-      name: payload.fromName || 'Sedifex Campaign',
-    })
-    sent += 1
+  const recipients = recipientsFromPayload.length
+    ? recipientsFromPayload.map((r) => ({
+        rowIndex: null,
+        email: (r?.email || '').toString().trim(),
+        name: (r?.name || '').toString().trim(),
+      }))
+    : sheetRows
+
+  recipients.forEach((recipient) => {
+    const email = recipient.email
+    if (!email) {
+      if (recipient.rowIndex && statusCol >= 0) {
+        sheet.getRange(recipient.rowIndex, statusCol + 1).setValue('SKIPPED')
+      }
+      return
+    }
+
+    attempted += 1
+
+    try {
+      MailApp.sendEmail({
+        to: email,
+        subject: payload.subject || 'Update from your store',
+        htmlBody: payload.html || '',
+        name: payload.fromName || 'Sedifex Campaign',
+      })
+      sent += 1
+
+      if (recipient.rowIndex && statusCol >= 0) {
+        sheet.getRange(recipient.rowIndex, statusCol + 1).setValue('SENT')
+      }
+      if (recipient.rowIndex && lastSentAtCol >= 0) {
+        sheet.getRange(recipient.rowIndex, lastSentAtCol + 1).setValue(new Date())
+      }
+    } catch (err) {
+      errors.push({ email, message: String(err) })
+      if (recipient.rowIndex && statusCol >= 0) {
+        sheet.getRange(recipient.rowIndex, statusCol + 1).setValue('ERROR')
+      }
+    }
   })
 
   return ContentService.createTextOutput(JSON.stringify({
     ok: true,
-    attempted: recipients.length,
+    attempted,
     sent,
+    failed: attempted - sent,
+    errors,
   })).setMimeType(ContentService.MimeType.JSON)
 }
 ```
