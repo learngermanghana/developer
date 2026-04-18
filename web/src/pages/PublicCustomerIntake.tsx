@@ -190,7 +190,7 @@ export default function PublicCustomerIntake() {
         <section className="public-customer-intake__card" style={{ borderColor: `${profile.accentColor}33` }}>
           {profile.logoUrl ? <img src={profile.logoUrl} alt={`${title} logo`} className="public-customer-intake__logo" /> : null}
           <p className="public-customer-intake__kicker" style={{ color: profile.accentColor }}>Customer Invite</p>
-          <h1>{profile.headline}</h1>
+          <h1 className="public-customer-intake__headline">{profile.headline}</h1>
           <p>{profile.storeName ? `You are joining ${profile.storeName}.` : 'You are joining our customer list.'}</p>
           <p>{profile.cta}</p>
           <p className="public-customer-intake__fallback">
@@ -215,6 +215,7 @@ export default function PublicCustomerIntake() {
               Print / Save PDF
             </button>
           </div>
+          <p className="public-customer-intake__powered-by">Powered by Sedifex</p>
         </section>
       </main>
     )
