@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Guides | Sedifex Developers</title>
+    <title>Sedifex Integration API Guide (v1) | Sedifex Developers</title>
     <link rel="stylesheet" href="styles.css" />
   </head>
   <body>
@@ -21,120 +21,118 @@
     </header>
 
     <main class="container section prose">
-      <h1>Guides</h1>
-
-      <h2>Integration delivery sequence (high confidence)</h2>
+      <h1>Sedifex Integration API Guide (v1)</h1>
       <p>
-        Recommended order for near-term product and operational payoff as of
-        <strong>April 4, 2026</strong>.
+        This guide defines how third-party websites (including Buy Sedifex) should authenticate,
+        call endpoints, deduplicate/cache responses, and migrate safely as the API evolves.
       </p>
+
+      <h2>1) Authentication and API keys</h2>
+      <p><strong>Required server-side config:</strong></p>
+      <ul>
+        <li><code>SEDIFEX_INTEGRATION_API_KEY</code> (legacy: <code>SEDIFEX_INTEGRATION_KEY</code>)</li>
+        <li><code>SEDIFEX_API_BASE_URL</code> (legacy: <code>SEDIFEX_INTEGRATION_API_BASE_URL</code>)</li>
+        <li><code>SEDIFEX_STORE_ID</code></li>
+      </ul>
+      <pre><code>SEDIFEX_API_BASE_URL=https://us-central1-sedifex-web.cloudfunctions.net
+SEDIFEX_STORE_ID=store_123
+SEDIFEX_INTEGRATION_API_KEY=sk_live_xxx</code></pre>
+      <ul>
+        <li><strong>Admin key mode:</strong> can access all stores when <code>storeId</code> is omitted.</li>
+        <li><strong>Store key mode:</strong> store-scoped access; <code>storeId</code> is required.</li>
+        <li>Never expose integration keys in browser bundles.</li>
+      </ul>
+      <p><strong>Required headers for authenticated endpoints:</strong></p>
+      <pre><code>x-api-key: &lt;master_or_store_integration_key&gt;
+X-Sedifex-Contract-Version: 2026-04-13
+Accept: application/json</code></pre>
+
+      <h2>2) Contract versioning</h2>
+      <ul>
+        <li><strong>Current contract version:</strong> <code>2026-04-13</code>.</li>
+        <li>Request header: <code>X-Sedifex-Contract-Version</code>.</li>
+        <li>Response headers: <code>x-sedifex-contract-version</code>, <code>x-sedifex-request-id</code>.</li>
+      </ul>
+
+      <h2>3) Endpoints (integration surface)</h2>
+      <ul>
+        <li><code>GET /v1/products</code> (public marketplace feed)</li>
+        <li><code>GET /v1IntegrationProducts?storeId=&lt;storeId&gt;</code> (authenticated)</li>
+        <li><code>GET /api/public-blog?storeId=&lt;storeId&gt;[&amp;slug=&lt;postSlug&gt;]</code> (public)</li>
+        <li><code>GET /v1IntegrationPromo?storeId=&lt;storeId&gt;</code> or <code>?slug=&lt;promoSlug&gt;</code></li>
+        <li><code>GET /v1IntegrationAvailability?storeId=&lt;storeId&gt;</code> (+ optional filters)</li>
+        <li><code>GET /integrationGallery?storeId=&lt;storeId&gt;</code></li>
+        <li><code>GET /integrationCustomers?storeId=&lt;storeId&gt;</code></li>
+        <li><code>GET /integrationTopSelling?storeId=&lt;storeId&gt;&amp;days=30&amp;limit=10</code></li>
+        <li><code>GET /integrationTikTokVideos?storeId=&lt;storeId&gt;</code></li>
+        <li><code>GET/POST /v1IntegrationBookings?storeId=&lt;storeId&gt;</code></li>
+        <li><code>POST /integration/checkout/create</code></li>
+        <li><code>GET /integration/orders/:reference</code></li>
+        <li><code>POST /integration/webhooks/payment-status</code> (Sedifex outbound)</li>
+      </ul>
+
+      <h2>4) Integration page wiring sequence</h2>
       <ol>
-        <li>
-          <strong>Ship real integration API keys + revoke/rotate UI</strong>
-          <ul>
-            <li>Store-scoped key generation (prefix + hashed secret at rest).</li>
-            <li>In-app metadata: key name, created time, last used time, status.</li>
-            <li>One-time secret reveal at creation.</li>
-            <li>Immediate revoke and documented rotate flow with overlap window.</li>
-            <li>Audit log entries for create/revoke/rotate.</li>
-          </ul>
-        </li>
-        <li>
-          <strong>Ship WordPress plugin MVP</strong>
-          <ul>
-            <li>Plugin settings for API key + store selection.</li>
-            <li>Product shortcode/block rendering.</li>
-            <li>Sync health panel (last success/failure, item count, next retry).</li>
-            <li>30–120 second cache window + manual sync trigger.</li>
-          </ul>
-        </li>
-        <li>
-          <strong>Ship basic product webhooks</strong>
-          <ul>
-            <li><code>product.created</code>, <code>product.updated</code>, <code>product.deleted</code>.</li>
-            <li>Per-endpoint signing secret with <code>X-Sedifex-Signature</code>.</li>
-            <li>Retry policy with exponential backoff.</li>
-            <li>Delivery log view with attempts and response codes.</li>
-            <li>Copy/paste signature verification docs.</li>
-          </ul>
-        </li>
+        <li>Load env config: base URL, store ID, integration key.</li>
+        <li>Attach required auth + contract headers.</li>
+        <li>Fetch integration endpoints server-side with <code>?storeId=...</code>.</li>
+        <li>Normalize records and dedupe by stable ids.</li>
+        <li>Cache + fallback + retry idempotent GET failures with backoff.</li>
+        <li>Log <code>x-sedifex-request-id</code> on all failures.</li>
       </ol>
 
-      <h3>Suggested cadence</h3>
+      <h2>5) Booking and checkout contract (important updates)</h2>
       <ul>
-        <li><strong>Milestone A (Weeks 1–2):</strong> API keys + revoke/rotate UI + audit logs.</li>
-        <li><strong>Milestone B (Weeks 3–4):</strong> WordPress MVP + sync health + onboarding guide.</li>
-        <li><strong>Milestone C (Weeks 5–6):</strong> Webhooks + signing + delivery logs + verification docs.</li>
-      </ul>
-      <p>
-        <strong>Dependency note:</strong> if overlap is required, keep key-management primitives
-        (creation, hashing, revoke, rotate, audit) as non-negotiable before broad partner rollout.
-      </p>
-
-      <h2>WordPress install guide (Sedifex Sync)</h2>
-      <p>
-        Use this setup to connect a WordPress site to a Sedifex product catalog. If you are using
-        Next.js on Vercel, use <code>quickstart.html</code> instead.
-      </p>
-      <h3>What this setup does</h3>
-      <ol>
-        <li>Uses a Sedifex integration API key.</li>
-        <li>Calls the <code>integrationProducts</code> endpoint.</li>
-        <li>Renders products in WordPress via shortcode.</li>
-        <li>Applies dedupe + fallback + cache strategy.</li>
-      </ol>
-
-      <h3>Prerequisites</h3>
-      <ul>
-        <li>A WordPress site where you can install plugins.</li>
-        <li>A Sedifex integration API key for the target store.</li>
-        <li>Sedifex API base URL for your deployed Functions endpoint.</li>
-      </ul>
-
-      <h3>Install steps</h3>
-      <ol>
+        <li>Create booking first via <code>POST /v1IntegrationBookings</code>, then create checkout session.</li>
         <li>
-          Install plugin scaffold. You can use Code Snippets or your preferred plugin workflow. A
-          baseline is included in <code>wordpress-plugin-sedifex-sync.php</code>.
+          <strong>Pre-checkout naming rule:</strong> use <code>bookingId</code> before hosted checkout
+          returns; do not treat pre-checkout IDs as a real <code>sedifexOrderId</code>.
         </li>
         <li>
-          Add a frontend/client script that requests
-          <code>integrationProducts?storeId=&lt;storeId&gt;</code> with
-          <code>Authorization: Bearer &lt;integration_key&gt;</code>.
-        </li>
-        <li>Create and place a shortcode like <code>[sedifex_products]</code>.</li>
-        <li>
-          Store config values:
-          <code>SEDIFEX_API_BASE_URL</code>, <code>SEDIFEX_STORE_ID</code>, and
-          <code>SEDIFEX_INTEGRATION_KEY</code>.
+          On create/update of integration booking documents, write
+          <code>syncStatus: "pending"</code> and <code>syncRequestedAt</code>.
         </li>
         <li>
-          Validate rendering, out-of-stock handling (<code>stockCount &lt;= 0</code>), and fallback
-          behavior under fetch failure.
+          Return URL completion is not payment proof; final state comes from webhook delivery or
+          <code>GET /integration/orders/:reference</code>.
         </li>
-      </ol>
-
-      <h3>Recommended hardening</h3>
-      <ul>
-        <li>Add a visible “Last synced at” timestamp.</li>
-        <li>Alert on repeated sync failures.</li>
-        <li>Rotate integration credentials periodically via Account → Integrations.</li>
+        <li>
+          In return/confirmation UI, explicitly tell users the team has received their data and
+          provide WhatsApp/email support channels for follow-up.
+        </li>
       </ul>
 
-      <h2>How to use Sedifex (current navigation guide)</h2>
-      <p>
-        A role-based walkthrough for owners/admins and staff/cashiers covering day-to-day usage,
-        daily checklists, and troubleshooting.
-      </p>
-      <p><a href="how-to-use-sedifex.html">Open the How to Use Sedifex guide</a>.</p>
-
-      <h2>Team and access model</h2>
+      <h2>6) Checkout pricing contract</h2>
+      <p>Use Sedifex as source of truth for totals (all values in minor units).</p>
       <ul>
-        <li>Invite developer collaborators per workspace/store assignment.</li>
-        <li>Limit key management and webhook admin access to least privilege roles.</li>
-        <li>Audit invite, role, key, and webhook changes during release milestones.</li>
+        <li><code>fulfillment_type</code> (PICKUP | DELIVERY)</li>
+        <li><code>subtotal</code>, <code>tax_total</code>, <code>delivery_fee</code></li>
+        <li><code>pre_processing_total</code>, <code>processing_fee_to_add</code>, <code>final_total</code></li>
+      </ul>
+      <p>Required sequence: preview → create → paystack webhook → order status fetch.</p>
+
+      <h2>7) Caching and deduplication</h2>
+      <ul>
+        <li>Deduplicate by <code>id</code> (or <code>productId</code>), optionally by <code>updatedAt</code>.</li>
+        <li>Products/top-selling: 30s cache + 120s stale-while-revalidate.</li>
+        <li>Promo/gallery: 60s cache + 300s stale-while-revalidate.</li>
+        <li>Keep small local fallback datasets for transient failures.</li>
       </ul>
 
+      <h2>8) Error handling</h2>
+      <ul>
+        <li><code>400</code>: malformed request or contract mismatch</li>
+        <li><code>401</code>: invalid integration key</li>
+        <li><code>404</code>: unknown store or slug</li>
+        <li><code>405</code>: unsupported method</li>
+      </ul>
+
+      <h2>9) Migration and compatibility</h2>
+      <ul>
+        <li>Additive fields may appear within same contract version; ignore unknown fields.</li>
+        <li>Breaking changes ship via new contract version with overlap migration window.</li>
+        <li>Use <code>shared/integrationTypes.ts</code> as shared type source of truth.</li>
+      </ul>
     </main>
   </body>
 </html>
