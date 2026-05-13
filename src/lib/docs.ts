@@ -92,7 +92,7 @@ function readDoc(relativeFilePath: string): DocRecord {
   const extension = path.extname(relativeFilePath).toLowerCase();
   const isMarkdown = extension === ".md" || extension === ".mdx";
 
-  const parsed = isMarkdown
+  const parsed: { data: Record<string, unknown>; content: string } = isMarkdown
     ? matter(raw)
     : {
         data: {},
