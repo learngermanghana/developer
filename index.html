@@ -1,274 +1,31 @@
 <!doctype html>
 <html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Sedifex Developer Platform | API Docs, Webhooks, and Integrations</title>
-    <meta
-      name="description"
-      content="Official Sedifex developer docs for API integrations, store-scoped keys, signed webhooks, and onboarding guides."
-    />
-    <meta
-      name="keywords"
-      content="Sedifex developer docs, Sedifex API, ecommerce integration API, webhook signing, developer onboarding"
-    />
-    <meta name="author" content="Sedifex" />
-    <meta name="robots" content="index, follow, max-snippet:-1, max-image-preview:large, max-video-preview:-1" />
-    <meta property="og:site_name" content="Sedifex Developer Docs" />
-    <meta property="og:locale" content="en_US" />
-    <meta property="og:title" content="Sedifex Developer Platform" />
-    <meta
-      property="og:description"
-      content="Build storefront, CMS, and partner integrations with store-scoped API keys and signed webhooks."
-    />
-    <meta property="og:type" content="website" />
-    <meta property="og:url" content="https://developer.sedifex.com/" />
-    <meta property="og:image" content="https://images.unsplash.com/photo-1461749280684-dccba630e2f6?auto=format&fit=crop&w=1600&q=80" />
-    <meta property="og:image:alt" content="Sedifex developer platform code and integration tooling" />
-    <meta name="twitter:card" content="summary_large_image" />
-    <meta name="twitter:title" content="Sedifex Developer Platform" />
-    <meta
-      name="twitter:description"
-      content="Official docs for Sedifex integrations, API keys, and signed webhooks."
-    />
-    <meta name="twitter:image" content="https://images.unsplash.com/photo-1461749280684-dccba630e2f6?auto=format&fit=crop&w=1600&q=80" />
-    <meta name="twitter:image:alt" content="Sedifex developer platform code and integration tooling" />
-    <link rel="canonical" href="https://developer.sedifex.com/" />
-    <script type="application/ld+json">
-      {
-        "@context": "https://schema.org",
-        "@graph": [
-          {
-            "@type": "Organization",
-            "name": "Sedifex",
-            "url": "https://developer.sedifex.com/",
-            "sameAs": [
-              "https://developer.sedifex.com/"
-            ]
-          },
-          {
-            "@type": "WebSite",
-            "name": "Sedifex Developer Docs",
-            "url": "https://developer.sedifex.com/",
-            "description": "Developer documentation for Sedifex API integrations, keys, webhooks, and onboarding."
-          },
-          {
-            "@type": "WebPage",
-            "name": "Sedifex Developer Platform",
-            "url": "https://developer.sedifex.com/",
-            "description": "Official Sedifex docs for integrations, API keys, signed webhooks, and onboarding workflows.",
-            "isPartOf": {
-              "@type": "WebSite",
-              "url": "https://developer.sedifex.com/"
-            }
-          }
-        ]
-      }
-    </script>
-    <link rel="stylesheet" href="styles.css" />
-  </head>
-  <body>
-    <header class="topbar">
-      <div class="container topbar-inner">
-        <a class="brand" href="index.html">developer.sedifex.com</a>
-        <nav class="nav" aria-label="Primary">
-          <a href="quickstart.html">Quickstart</a>
-          <a href="api-reference.html">API Reference</a>
-          <a href="webhooks.html">Webhooks</a>
-          <a href="guides.html">Guides</a>
-          <a href="troubleshooting.html">Troubleshooting</a>
-        </nav>
-      </div>
-    </header>
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Sedifex Docs | Navigation & Integration Guides</title>
+  <meta name="description" content="Official Sedifex documentation: learn current app navigation, daily workflows, and integration API guidance for retail and service businesses." />
+  <meta name="robots" content="index,follow" />
+</head>
+<body>
+  <header>
+    <h1>Sedifex Documentation</h1>
+    <nav aria-label="Primary">
+      <ul>
+        <li><a href="index.html">Home</a></li>
+        <li><a href="how-to-use-sedifex.html">How to Use Sedifex</a></li>
+        <li><a href="integration-api-guide.md">Integration API Guide</a></li>
+      </ul>
+    </nav>
+  </header>
 
-    <main>
-      <section class="hero">
-        <div class="container hero-grid">
-          <div>
-            <p class="eyebrow">Sedifex Developer Platform</p>
-            <h1>Ship your Sedifex integration in 5 minutes.</h1>
-            <p class="lead">
-              Build storefront, CMS, and partner integrations with store-scoped API keys, signed
-              webhooks, and practical operations guidance for fast onboarding.
-            </p>
-            <div class="actions">
-              <a class="btn" href="quickstart.html">Start in 5 minutes</a>
-              <a class="btn secondary" href="api-reference.html">Explore API Reference</a>
-            </div>
-          </div>
-          <img
-            class="hero-image"
-            src="https://images.unsplash.com/photo-1518770660439-4636190af475?auto=format&fit=crop&w=1400&q=80"
-            alt="Developer workstation with code on screen"
-            loading="eager"
-            decoding="async"
-          />
-        </div>
-      </section>
-
-      <section class="container section">
-        <h2>Build faster with real-world integration workflows</h2>
-        <div class="image-grid">
-          <article class="image-card">
-            <img
-              src="https://images.unsplash.com/photo-1461749280684-dccba630e2f6?auto=format&fit=crop&w=1000&q=80"
-              alt="Code editor open during API development"
-              loading="lazy"
-              decoding="async"
-            />
-            <p>Launch API integrations quickly with clear endpoint patterns.</p>
-          </article>
-          <article class="image-card">
-            <img
-              src="https://images.unsplash.com/photo-1526374965328-7f61d4dc18c5?auto=format&fit=crop&w=1000&q=80"
-              alt="Abstract network pattern representing webhook events"
-              loading="lazy"
-              decoding="async"
-            />
-            <p>Secure event delivery with webhook signing and replay-safe validation.</p>
-          </article>
-          <article class="image-card">
-            <img
-              src="https://images.unsplash.com/photo-1551281044-8b19750cc7b2?auto=format&fit=crop&w=1000&q=80"
-              alt="Dashboard analytics viewed on a large screen"
-              loading="lazy"
-              decoding="async"
-            />
-            <p>Monitor key usage, audit activity, and reliability with guidance across docs pages.</p>
-          </article>
-        </div>
-      </section>
-
-      <section class="container section">
-        <h2>Information Architecture (v1)</h2>
-        <div class="grid two">
-          <article class="card">
-            <h3>Public (No Login)</h3>
-            <ul>
-              <li>Home</li>
-              <li>Quickstart</li>
-              <li>API Reference</li>
-              <li>Webhooks</li>
-              <li>Guides</li>
-              <li>Troubleshooting</li>
-            </ul>
-          </article>
-
-          <article class="card">
-            <h3>Operational docs</h3>
-            <ul>
-              <li>Quickstart: key creation, rotation, and last-used checks</li>
-              <li>Webhooks: endpoint setup, secret management, test delivery, retries</li>
-              <li>Troubleshooting: sync logs, repeated failures, rollback workflow</li>
-              <li>Guides: team access model and rollout sequencing</li>
-              <li>API Reference: key, webhook, delivery, and audit endpoints</li>
-            </ul>
-          </article>
-        </div>
-      </section>
-
-      <section class="container section">
-        <h2>First 5 Endpoints to Launch</h2>
-        <div class="grid two">
-          <article class="card endpoint">
-            <code>GET /integrationProducts?storeId=&lt;storeId&gt;</code>
-            <p>Read products for authorized partner integrations.</p>
-          </article>
-          <article class="card endpoint">
-            <code>POST /developer/keys</code>
-            <p>Create a store-scoped integration key (secret shown once).</p>
-          </article>
-          <article class="card endpoint">
-            <code>POST /developer/keys/{keyId}/revoke</code>
-            <p>Immediately invalidate a compromised or unused key.</p>
-          </article>
-          <article class="card endpoint">
-            <code>POST /developer/webhooks</code>
-            <p>Register endpoint URL and per-endpoint signing secret.</p>
-          </article>
-          <article class="card endpoint">
-            <code>POST /developer/webhooks/{endpointId}/test</code>
-            <p>Send signed test event to validate setup before go-live.</p>
-          </article>
-        </div>
-      </section>
-
-      <section class="container section">
-        <h2>RBAC Matrix (Recommended)</h2>
-        <div class="table-wrap">
-          <table>
-            <thead>
-              <tr>
-                <th>Role</th>
-                <th>Read Docs</th>
-                <th>Read Products API</th>
-                <th>Manage API Keys</th>
-                <th>Manage Webhooks</th>
-                <th>View Audit Logs</th>
-                <th>Manage Team</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr>
-                <td>Public</td>
-                <td>✅</td>
-                <td>❌</td>
-                <td>❌</td>
-                <td>❌</td>
-                <td>❌</td>
-                <td>❌</td>
-              </tr>
-              <tr>
-                <td>Developer (invited)</td>
-                <td>✅</td>
-                <td>✅</td>
-                <td>✅ (assigned store)</td>
-                <td>✅ (assigned store)</td>
-                <td>✅</td>
-                <td>❌</td>
-              </tr>
-              <tr>
-                <td>Manager/Admin</td>
-                <td>✅</td>
-                <td>✅</td>
-                <td>✅</td>
-                <td>✅</td>
-                <td>✅</td>
-                <td>✅ (except ownership transfer)</td>
-              </tr>
-              <tr>
-                <td>Owner</td>
-                <td>✅</td>
-                <td>✅</td>
-                <td>✅</td>
-                <td>✅</td>
-                <td>✅</td>
-                <td>✅</td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-      </section>
-
-      <section class="container section">
-        <h2>Onboarding Flow (Exact Login Path)</h2>
-        <ol class="flow-list">
-          <li>Developer lands on public docs.</li>
-          <li>Clicks <strong>Create Integration</strong> and is redirected to Sedifex Auth.</li>
-          <li>If user has no account, complete self-signup or invite-based signup.</li>
-          <li>After login, backend validates <code>teamMembers</code> + <code>storeId</code>.</li>
-          <li>If authorized, open the workspace/store integration settings in-app.</li>
-          <li>Generate key and reveal secret exactly once.</li>
-          <li>Use quickstart sample to connect the external website.</li>
-        </ol>
-      </section>
-    </main>
-
-    <footer class="footer">
-      <div class="container footer-inner">
-        <span>Sedifex Developer Docs v1</span>
-        <a href="quickstart.html">Get started</a>
-      </div>
-    </footer>
-  </body>
+  <main>
+    <h2>Get started</h2>
+    <p>Use this documentation hub to understand Sedifex app navigation and integration workflows.</p>
+    <ul>
+      <li><a href="how-to-use-sedifex.html">How to Use Sedifex (Current Navigation Guide)</a></li>
+      <li><a href="integration-api-guide.md">Sedifex Integration API Guide (v1)</a></li>
+    </ul>
+  </main>
+</body>
 </html>
