@@ -4,270 +4,645 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>How to Use Sedifex</title>
-  <link rel="stylesheet" href="styles.css" />
+  <style>
+    :root {
+      --bg: #f6f8fb;
+      --surface: #ffffff;
+      --surface-soft: #fdfefe;
+      --text: #18212f;
+      --muted: #5f6b7a;
+      --border: #dbe3ec;
+      --primary: #0f766e;
+      --primary-dark: #0b5c56;
+      --accent: #ecfeff;
+      --shadow: 0 10px 30px rgba(15, 23, 42, 0.08);
+      --radius: 18px;
+      --radius-sm: 12px;
+      --max-width: 1180px;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    html {
+      scroll-behavior: smooth;
+    }
+
+    body {
+      margin: 0;
+      font-family: Inter, Arial, Helvetica, sans-serif;
+      background: linear-gradient(180deg, #f8fbff 0%, #f4f7fb 100%);
+      color: var(--text);
+      line-height: 1.65;
+    }
+
+    a {
+      color: var(--primary);
+      text-decoration: none;
+    }
+
+    a:hover {
+      text-decoration: underline;
+    }
+
+    header {
+      position: sticky;
+      top: 0;
+      z-index: 1000;
+      backdrop-filter: blur(14px);
+      background: rgba(255, 255, 255, 0.88);
+      border-bottom: 1px solid rgba(219, 227, 236, 0.9);
+    }
+
+    .topbar {
+      max-width: var(--max-width);
+      margin: 0 auto;
+      padding: 16px 20px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      flex-wrap: wrap;
+    }
+
+    .brand {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+
+    .brand h1 {
+      margin: 0;
+      font-size: 1.35rem;
+      line-height: 1.2;
+    }
+
+    .brand p {
+      margin: 0;
+      color: var(--muted);
+      font-size: 0.95rem;
+    }
+
+    nav {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+    }
+
+    nav a {
+      padding: 10px 14px;
+      border-radius: 999px;
+      background: #f1f5f9;
+      color: var(--text);
+      font-weight: 600;
+      font-size: 0.95rem;
+      transition: 0.2s ease;
+    }
+
+    nav a:hover {
+      text-decoration: none;
+      background: var(--accent);
+      color: var(--primary-dark);
+    }
+
+    .container {
+      max-width: var(--max-width);
+      margin: 0 auto;
+      padding: 28px 20px 64px;
+    }
+
+    .hero {
+      background: linear-gradient(135deg, #0f766e 0%, #155e75 100%);
+      color: white;
+      padding: 36px 28px;
+      border-radius: 24px;
+      box-shadow: var(--shadow);
+      margin-bottom: 24px;
+    }
+
+    .hero h2 {
+      margin: 0 0 12px;
+      font-size: clamp(1.8rem, 3vw, 2.6rem);
+      line-height: 1.15;
+    }
+
+    .hero p {
+      margin: 0;
+      max-width: 760px;
+      color: rgba(255, 255, 255, 0.92);
+      font-size: 1.03rem;
+    }
+
+    .hero-links {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+      margin-top: 22px;
+    }
+
+    .hero-links a {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 12px 16px;
+      border-radius: 12px;
+      background: rgba(255, 255, 255, 0.14);
+      color: white;
+      font-weight: 600;
+      border: 1px solid rgba(255, 255, 255, 0.18);
+    }
+
+    .hero-links a:hover {
+      text-decoration: none;
+      background: rgba(255, 255, 255, 0.22);
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(12, 1fr);
+      gap: 20px;
+    }
+
+    .card {
+      grid-column: span 12;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 24px;
+      box-shadow: var(--shadow);
+    }
+
+    .card h2 {
+      margin-top: 0;
+      margin-bottom: 12px;
+      font-size: 1.35rem;
+    }
+
+    .card h3 {
+      margin-top: 20px;
+      margin-bottom: 10px;
+      font-size: 1.02rem;
+    }
+
+    .lead {
+      color: var(--muted);
+      margin-top: 0;
+    }
+
+    .muted {
+      color: var(--muted);
+    }
+
+    .badge {
+      display: inline-block;
+      padding: 6px 10px;
+      border-radius: 999px;
+      background: var(--accent);
+      color: var(--primary-dark);
+      font-weight: 700;
+      font-size: 0.8rem;
+      margin-bottom: 12px;
+    }
+
+    .split {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 18px;
+    }
+
+    .panel {
+      background: var(--surface-soft);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      padding: 18px;
+    }
+
+    .panel h3,
+    .panel h4 {
+      margin-top: 0;
+      margin-bottom: 10px;
+    }
+
+    .section-card {
+      background: #fbfdff;
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 18px;
+      margin-top: 16px;
+    }
+
+    ul, ol {
+      padding-left: 20px;
+      margin: 10px 0 0;
+    }
+
+    li + li {
+      margin-top: 8px;
+    }
+
+    .tip,
+    .note {
+      margin-top: 14px;
+      padding: 14px 16px;
+      border-radius: 12px;
+      border-left: 4px solid var(--primary);
+      background: #f0fdfa;
+    }
+
+    .checklists {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 16px;
+      margin-top: 16px;
+    }
+
+    .checklist-box {
+      background: #fbfdff;
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 18px;
+    }
+
+    .checklist-box h3 {
+      margin-top: 0;
+    }
+
+    .troubleshoot-item {
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 16px 18px;
+      background: #fcfeff;
+    }
+
+    .troubleshoot-item + .troubleshoot-item {
+      margin-top: 12px;
+    }
+
+    .troubleshoot-item h3 {
+      margin: 0 0 8px;
+      font-size: 1rem;
+    }
+
+    footer {
+      max-width: var(--max-width);
+      margin: 0 auto;
+      padding: 0 20px 40px;
+      color: var(--muted);
+      font-size: 0.95rem;
+    }
+
+    @media (max-width: 900px) {
+      .split,
+      .checklists {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    @media (max-width: 640px) {
+      .topbar {
+        padding: 14px 16px;
+      }
+
+      .container {
+        padding: 20px 16px 48px;
+      }
+
+      .hero {
+        padding: 26px 20px;
+      }
+
+      .card {
+        padding: 18px;
+      }
+
+      nav {
+        width: 100%;
+      }
+
+      nav a {
+        font-size: 0.9rem;
+      }
+    }
+  </style>
 </head>
 <body>
   <header>
-    <h1>How to Use Sedifex</h1>
-    <nav>
-      <a href="index.html">Home</a>
-      <a href="how-to-use-sedifex.html">Navigation Guide</a>
-      <a href="integration-api-guide.html">Integration API Guide</a>
-    </nav>
+    <div class="topbar">
+      <div class="brand">
+        <h1>How to Use Sedifex</h1>
+        <p>Current navigation guide for owners, admins, and staff</p>
+      </div>
+
+      <nav>
+        <a href="index.html">Home</a>
+        <a href="how-to-use-sedifex.html">Navigation Guide</a>
+        <a href="integration-api-guide.html">Integration API Guide</a>
+      </nav>
+    </div>
   </header>
 
-  <main>
-    <section>
-      <h2>Current Navigation Guide</h2>
+  <main class="container">
+    <section class="hero">
+      <h2>Sedifex Navigation & Daily Operations Guide</h2>
       <p>
         Sedifex is a POS and operations platform for retail and service businesses.
-        This guide reflects the current app navigation and core workflows.
+        This page reflects the current app navigation, role-based access, and the main workflows teams use every day.
       </p>
+
+      <div class="hero-links">
+        <a href="#navigation">View navigation</a>
+        <a href="#daily-checklist">Daily checklist</a>
+        <a href="#troubleshooting">Troubleshooting</a>
+      </div>
     </section>
 
-    <section>
-      <h2>Who this guide is for</h2>
-      <ul>
-        <li><strong>Owners/Admins</strong> setting up and managing billing, integrations, and growth channels.</li>
-        <li><strong>Staff/Cashiers</strong> handling sales, customers, bookings, and day-to-day records.</li>
-      </ul>
-    </section>
+    <div class="grid">
+      <section class="card">
+        <span class="badge">Who this guide is for</span>
+        <div class="split">
+          <div class="panel">
+            <h3>Owners / Admins</h3>
+            <p class="muted">
+              Set up and manage billing, integrations, catalog structure, team access, and growth channels.
+            </p>
+          </div>
+          <div class="panel">
+            <h3>Staff / Cashiers</h3>
+            <p class="muted">
+              Handle sales, customers, bookings, and business records during day-to-day operations.
+            </p>
+          </div>
+        </div>
+      </section>
 
-    <section>
-      <h2>1) Sign in and confirm workspace access</h2>
-      <ol>
-        <li>Open your Sedifex app URL (for example, <code>https://app.sedifex.com</code>).</li>
-        <li>Sign in with your approved account.</li>
-        <li>Confirm your active workspace/store.</li>
-        <li>If you manage multiple stores, switch from the workspace selector before starting work.</li>
-      </ol>
-      <p>If data looks missing after sign-in, confirm you are in the correct workspace and role.</p>
-    </section>
+      <section class="card">
+        <span class="badge">Step 1</span>
+        <h2>Sign in and confirm workspace access</h2>
+        <ol>
+          <li>Open your Sedifex app URL, for example <code>https://app.sedifex.com</code>.</li>
+          <li>Sign in with your approved account.</li>
+          <li>Confirm your active workspace or store.</li>
+          <li>If you manage multiple stores, switch from the workspace selector before starting work.</li>
+        </ol>
+        <div class="note">
+          If data looks missing after sign-in, first confirm that you are in the correct workspace and role.
+        </div>
+      </section>
 
-    <section>
-      <h2>2) Understand the current navigation</h2>
+      <section class="card" id="navigation">
+        <span class="badge">Step 2</span>
+        <h2>Understand the current navigation</h2>
+        <p class="lead">
+          Navigation is role-based, so owners and staff do not see the same sections.
+        </p>
 
-      <h3>Owner navigation</h3>
-      <ul>
-        <li>Dashboard</li>
-        <li>Items</li>
-        <li>Sell</li>
-        <li>Customers</li>
-        <li>Bookings</li>
-        <li>Blog</li>
-        <li>SMS</li>
-        <li>Bulk email</li>
-        <li>Business records</li>
-        <li>Public page</li>
-        <li>Account</li>
-      </ul>
+        <div class="split">
+          <div class="panel">
+            <h3>Owner navigation</h3>
+            <ul>
+              <li>Dashboard</li>
+              <li>Items</li>
+              <li>Sell</li>
+              <li>Customers</li>
+              <li>Bookings</li>
+              <li>Blog</li>
+              <li>SMS</li>
+              <li>Bulk email</li>
+              <li>Business records</li>
+              <li>Public page</li>
+              <li>Account</li>
+            </ul>
+          </div>
 
-      <h3>Staff navigation</h3>
-      <ul>
-        <li>Sell</li>
-        <li>Customers</li>
-        <li>Bookings</li>
-        <li>Blog</li>
-        <li>Business records</li>
-      </ul>
+          <div class="panel">
+            <h3>Staff navigation</h3>
+            <ul>
+              <li>Sell</li>
+              <li>Customers</li>
+              <li>Bookings</li>
+              <li>Blog</li>
+              <li>Business records</li>
+            </ul>
+          </div>
+        </div>
+      </section>
 
-      <p><strong>Note:</strong> Navigation is role-based, so owners and staff do not see the same sections.</p>
-    </section>
+      <section class="card">
+        <span class="badge">Main sections</span>
+        <h2>What each page is used for</h2>
 
-    <section>
-      <h2>3) Dashboard (owner)</h2>
-      <p>Use <strong>Dashboard</strong> for an at-a-glance view of sales, performance trends, and priorities.</p>
-      <p>Typical use:</p>
-      <ul>
-        <li>Review today’s performance snapshot.</li>
-        <li>Check progress against recent periods.</li>
-        <li>Jump quickly to items, SMS, and other actions.</li>
-      </ul>
-      <p>Start each day here to set priorities.</p>
-    </section>
+        <div class="section-card">
+          <h3>Dashboard (owner)</h3>
+          <p>Use <strong>Dashboard</strong> for an at-a-glance view of sales, trends, and current priorities.</p>
+          <ul>
+            <li>Review today’s performance snapshot.</li>
+            <li>Check progress against recent periods.</li>
+            <li>Jump quickly to items, SMS, and other actions.</li>
+          </ul>
+          <p class="muted">Start each day here to set priorities.</p>
+        </div>
 
-    <section>
-      <h2>4) Items</h2>
-      <p>Use <strong>Items</strong> to manage your product and service catalog.</p>
-      <p>Common tasks:</p>
-      <ul>
-        <li>Add or edit item name, category, price, and stock.</li>
-        <li>Maintain barcode/SKU values for quick selling.</li>
-        <li>Keep descriptions and images clean for team clarity and customer receipts.</li>
-      </ul>
-      <p><strong>Tip:</strong> Set a consistent naming convention for size, unit, and variant format.</p>
-    </section>
+        <div class="section-card">
+          <h3>Items</h3>
+          <p>Use <strong>Items</strong> to manage your product and service catalog.</p>
+          <ul>
+            <li>Add or edit item name, category, price, and stock.</li>
+            <li>Maintain barcode and SKU values for quick selling.</li>
+            <li>Keep descriptions and images clean for team clarity and customer receipts.</li>
+          </ul>
+          <div class="tip">
+            Tip: Use a consistent naming style for size, unit, and variant format.
+          </div>
+        </div>
 
-    <section>
-      <h2>5) Sell</h2>
-      <p>Use <strong>Sell</strong> for checkout and transaction processing.</p>
-      <p>Typical flow:</p>
-      <ol>
-        <li>Search or scan item.</li>
-        <li>Add to cart and adjust quantity.</li>
-        <li>Confirm totals and discounts.</li>
-        <li>Select payment method.</li>
-        <li>Complete sale and issue receipt.</li>
-      </ol>
-      <p>Also available from Sell:</p>
-      <ul>
-        <li><strong>Close day</strong>: daily reconciliation and shift close checks.</li>
-        <li><strong>Invoice</strong>: owner invoice generation and sharing for customers who need formal billing.</li>
-      </ul>
-    </section>
+        <div class="section-card">
+          <h3>Sell</h3>
+          <p>Use <strong>Sell</strong> for checkout and transaction processing.</p>
+          <ol>
+            <li>Search or scan item.</li>
+            <li>Add to cart and adjust quantity.</li>
+            <li>Confirm totals and discounts.</li>
+            <li>Select payment method.</li>
+            <li>Complete sale and issue receipt.</li>
+          </ol>
+          <ul>
+            <li><strong>Close day</strong> for reconciliation and shift-close checks.</li>
+            <li><strong>Invoice</strong> for formal billing and invoice sharing.</li>
+          </ul>
+        </div>
 
-    <section>
-      <h2>6) Customers</h2>
-      <p>Use <strong>Customers</strong> to build and maintain customer records.</p>
-      <ul>
-        <li>Add and update customer profiles.</li>
-        <li>Link customers to sales and follow-ups.</li>
-        <li>Improve delivery, reminders, and campaign targeting quality.</li>
-      </ul>
-      <p>Accurate contact data reduces failed communication.</p>
-    </section>
+        <div class="section-card">
+          <h3>Customers</h3>
+          <p>Use <strong>Customers</strong> to build and maintain customer records.</p>
+          <ul>
+            <li>Add and update customer profiles.</li>
+            <li>Link customers to sales and follow-ups.</li>
+            <li>Improve reminder, delivery, and campaign targeting quality.</li>
+          </ul>
+          <p class="muted">Accurate contact data reduces failed communication.</p>
+        </div>
 
-    <section>
-      <h2>7) Bookings</h2>
-      <p>Use <strong>Bookings</strong> for appointment and schedule management.</p>
-      <ul>
-        <li>Create bookings.</li>
-        <li>Update booking statuses.</li>
-        <li>Keep customer notes and timing accurate for team handoffs.</li>
-      </ul>
-      <p>Consistent status updates improve service reliability.</p>
-    </section>
+        <div class="section-card">
+          <h3>Bookings</h3>
+          <p>Use <strong>Bookings</strong> for appointment and schedule management.</p>
+          <ul>
+            <li>Create bookings.</li>
+            <li>Update booking statuses.</li>
+            <li>Keep notes and timing accurate for team handoffs.</li>
+          </ul>
+          <p class="muted">Consistent status updates improve service reliability.</p>
+        </div>
 
-    <section>
-      <h2>8) Blog</h2>
-      <p>Use <strong>Blog</strong> to publish content and promotions tied to your store.</p>
-      <p>Common uses:</p>
-      <ul>
-        <li>Share offers and updates.</li>
-        <li>Publish featured products.</li>
-        <li>Keep your public-facing content fresh.</li>
-      </ul>
-      <p>When available, use product-linked imagery to speed up post creation.</p>
-    </section>
+        <div class="section-card">
+          <h3>Blog</h3>
+          <p>Use <strong>Blog</strong> to publish content and promotions tied to your store.</p>
+          <ul>
+            <li>Share offers and updates.</li>
+            <li>Publish featured products.</li>
+            <li>Keep public-facing content fresh.</li>
+          </ul>
+        </div>
 
-    <section>
-      <h2>9) SMS</h2>
-      <p>Use <strong>SMS</strong> for targeted customer outreach.</p>
-      <p>Best practices:</p>
-      <ul>
-        <li>Segment recipients before sending.</li>
-        <li>Keep messages short and clear.</li>
-        <li>Check estimated usage or credits before launch.</li>
-        <li>Avoid duplicate campaigns.</li>
-      </ul>
-    </section>
+        <div class="section-card">
+          <h3>SMS</h3>
+          <p>Use <strong>SMS</strong> for targeted customer outreach.</p>
+          <ul>
+            <li>Segment recipients before sending.</li>
+            <li>Keep messages short and clear.</li>
+            <li>Check usage or credits before launch.</li>
+            <li>Avoid duplicate campaigns.</li>
+          </ul>
+        </div>
 
-    <section>
-      <h2>10) Bulk email</h2>
-      <p>Use <strong>Bulk email</strong> for longer-form campaigns and announcements.</p>
-      <p>Typical workflow:</p>
-      <ul>
-        <li>Prepare audience and subject.</li>
-        <li>Draft campaign content.</li>
-        <li>Verify sender and delivery setup in <strong>Account → Integrations</strong>.</li>
-        <li>Send and monitor response.</li>
-      </ul>
-      <p>Use email for richer content and SMS for urgent or short reminders.</p>
-    </section>
+        <div class="section-card">
+          <h3>Bulk email</h3>
+          <p>Use <strong>Bulk email</strong> for longer-form campaigns and announcements.</p>
+          <ul>
+            <li>Prepare audience and subject.</li>
+            <li>Draft campaign content.</li>
+            <li>Verify sender and delivery setup in <strong>Account → Integrations</strong>.</li>
+            <li>Send and monitor responses.</li>
+          </ul>
+          <p class="muted">Use email for richer content and SMS for short or urgent reminders.</p>
+        </div>
 
-    <section>
-      <h2>11) Business records</h2>
-      <p>Use <strong>Business records</strong> to manage business income and expense records.</p>
-      <p>Typical uses:</p>
-      <ul>
-        <li>Log business expenses with meaningful labels.</li>
-        <li>Keep records current for reporting and reviews.</li>
-        <li>Support profit tracking alongside sales.</li>
-      </ul>
-      <p>Update records daily to avoid end-of-month backlogs.</p>
-    </section>
+        <div class="section-card">
+          <h3>Business records</h3>
+          <p>Use <strong>Business records</strong> to manage business income and expense records.</p>
+          <ul>
+            <li>Log expenses with meaningful labels.</li>
+            <li>Keep records current for reporting and reviews.</li>
+            <li>Support profit tracking alongside sales.</li>
+          </ul>
+          <p class="muted">Update records daily to avoid end-of-month backlog.</p>
+        </div>
 
-    <section>
-      <h2>12) Public page</h2>
-      <p>Use <strong>Public page</strong> to manage your customer-facing store profile.</p>
-      <p>Update regularly:</p>
-      <ul>
-        <li>Store details and contact channels.</li>
-        <li>Public catalog visibility.</li>
-        <li>Promotions and brand content.</li>
-      </ul>
-      <p>Keep this page current so customers see accurate information.</p>
-    </section>
+        <div class="section-card">
+          <h3>Public page</h3>
+          <p>Use <strong>Public page</strong> to manage your customer-facing store profile.</p>
+          <ul>
+            <li>Update store details and contact channels.</li>
+            <li>Control public catalog visibility.</li>
+            <li>Publish promotions and brand content.</li>
+          </ul>
+        </div>
 
-    <section>
-      <h2>13) Account (owner)</h2>
-      <p>Use <strong>Account</strong> for workspace controls and setup.</p>
-      <p>Typical tasks:</p>
-      <ul>
-        <li>Billing and subscription management.</li>
-        <li>Integrations and API keys.</li>
-        <li>Team/workspace configuration and security settings.</li>
-        <li>Email delivery and other channel setup.</li>
-      </ul>
-      <p>Review account settings weekly.</p>
-    </section>
+        <div class="section-card">
+          <h3>Account (owner)</h3>
+          <p>Use <strong>Account</strong> for workspace controls and setup.</p>
+          <ul>
+            <li>Billing and subscription management.</li>
+            <li>Integrations and API keys.</li>
+            <li>Team and workspace configuration.</li>
+            <li>Security and delivery channel setup.</li>
+          </ul>
+          <p class="muted">Review account settings weekly.</p>
+        </div>
+      </section>
 
-    <section>
-      <h2>14) Daily operating checklist</h2>
+      <section class="card" id="daily-checklist">
+        <span class="badge">Step 3</span>
+        <h2>Daily operating checklist</h2>
 
-      <h3>Start of day</h3>
-      <ul>
-        <li>Confirm internet and device readiness.</li>
-        <li>Review <strong>Dashboard</strong> (owner) or pending tasks (staff).</li>
-        <li>Check critical stock in <strong>Items</strong>.</li>
-        <li>Confirm cashier and staff access.</li>
-      </ul>
+        <div class="checklists">
+          <div class="checklist-box">
+            <h3>Start of day</h3>
+            <ul>
+              <li>Confirm internet and device readiness.</li>
+              <li>Review <strong>Dashboard</strong> or pending tasks.</li>
+              <li>Check critical stock in <strong>Items</strong>.</li>
+              <li>Confirm cashier and staff access.</li>
+            </ul>
+          </div>
 
-      <h3>During operations</h3>
-      <ul>
-        <li>Process transactions in <strong>Sell</strong>.</li>
-        <li>Keep customer records current.</li>
-        <li>Update <strong>Bookings</strong> statuses in real time.</li>
-        <li>Log expenses in <strong>Business records</strong>.</li>
-      </ul>
+          <div class="checklist-box">
+            <h3>During operations</h3>
+            <ul>
+              <li>Process transactions in <strong>Sell</strong>.</li>
+              <li>Keep customer records current.</li>
+              <li>Update <strong>Bookings</strong> in real time.</li>
+              <li>Log expenses in <strong>Business records</strong>.</li>
+            </ul>
+          </div>
 
-      <h3>End of day</h3>
-      <ul>
-        <li>Run <strong>Close day</strong> checks.</li>
-        <li>Review pending invoices.</li>
-        <li>Complete priority SMS and email follow-ups.</li>
-        <li>Confirm important public updates are live.</li>
-      </ul>
-    </section>
+          <div class="checklist-box">
+            <h3>End of day</h3>
+            <ul>
+              <li>Run <strong>Close day</strong> checks.</li>
+              <li>Review pending invoices.</li>
+              <li>Complete SMS and email follow-ups.</li>
+              <li>Confirm public updates are live.</li>
+            </ul>
+          </div>
+        </div>
+      </section>
 
-    <section>
-      <h2>15) Quick troubleshooting</h2>
+      <section class="card" id="troubleshooting">
+        <span class="badge">Step 4</span>
+        <h2>Quick troubleshooting</h2>
 
-      <h3>I can’t find Product tab</h3>
-      <p>It is now <strong>Items</strong>.</p>
+        <div class="troubleshoot-item">
+          <h3>I can’t find Product tab</h3>
+          <p>It is now <strong>Items</strong>.</p>
+        </div>
 
-      <h3>I can’t find invoice</h3>
-      <p>Open <strong>Sell</strong> and use the <strong>Invoice</strong> option.</p>
+        <div class="troubleshoot-item">
+          <h3>I can’t find invoice</h3>
+          <p>Open <strong>Sell</strong> and use the <strong>Invoice</strong> option.</p>
+        </div>
 
-      <h3>My navigation looks different</h3>
-      <p>Your account role controls which pages are visible.</p>
+        <div class="troubleshoot-item">
+          <h3>My navigation looks different</h3>
+          <p>Your account role controls which pages are visible.</p>
+        </div>
 
-      <h3>Campaign sending is blocked</h3>
-      <p>Check credits for SMS and integration setup in <strong>Account → Integrations</strong> for email and SMS-related services.</p>
+        <div class="troubleshoot-item">
+          <h3>Campaign sending is blocked</h3>
+          <p>Check SMS credits and confirm setup in <strong>Account → Integrations</strong> for email or SMS services.</p>
+        </div>
 
-      <h3>My public details are wrong</h3>
-      <p>Update them in <strong>Public page</strong>, then confirm your changes were saved and published.</p>
-    </section>
+        <div class="troubleshoot-item">
+          <h3>My public details are wrong</h3>
+          <p>Update them in <strong>Public page</strong>, then confirm the changes were saved and published.</p>
+        </div>
+      </section>
 
-    <section>
-      <h2>Related docs</h2>
-      <ul>
-        <li><a href="README.md">Main setup</a></li>
-        <li><a href="docs/integration-api-guide.md">Integration API guide</a></li>
-        <li><a href="docs/checkout-preview-reference.md">Checkout preview contract</a></li>
-        <li><a href="docs/webhooks-signature-verification.md">Webhook signatures</a></li>
-      </ul>
-    </section>
+      <section class="card">
+        <span class="badge">Related docs</span>
+        <h2>Helpful links</h2>
+        <ul>
+          <li><a href="README.md">Main setup</a></li>
+          <li><a href="docs/integration-api-guide.md">Integration API guide</a></li>
+          <li><a href="docs/checkout-preview-reference.md">Checkout preview contract</a></li>
+          <li><a href="docs/webhooks-signature-verification.md">Webhook signatures</a></li>
+        </ul>
+      </section>
+    </div>
   </main>
+
+  <footer>
+    <p>For the complete operating guide, you can also link this page to your markdown source or internal documentation.</p>
+  </footer>
 </body>
 </html>
