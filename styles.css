@@ -1,5 +1,6 @@
 :root {
   --bg: #0b1220;
+  --bg-2: #0f1a2f;
   --panel: #111a2b;
   --panel-soft: #101a2a;
   --text: #e8edf7;
@@ -8,18 +9,25 @@
   --brand: #5cc8ff;
   --brand-strong: #39b8f7;
   --ok: #2dcc95;
+  --glow: rgb(92 200 255 / 0.32);
 }
 
 * {
   box-sizing: border-box;
 }
 
+html {
+  scroll-behavior: smooth;
+}
+
 body {
   margin: 0;
   color: var(--text);
-  background: radial-gradient(1200px 600px at 10% -10%, #13213a 0%, var(--bg) 55%);
+  background:
+    radial-gradient(900px 420px at 85% -20%, rgb(64 130 255 / 0.18) 0%, transparent 60%),
+    radial-gradient(1100px 600px at 10% -10%, #13213a 0%, var(--bg) 55%);
   font-family: Inter, ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif;
-  line-height: 1.55;
+  line-height: 1.6;
 }
 
 .container {
@@ -31,9 +39,9 @@ body {
   position: sticky;
   top: 0;
   z-index: 10;
-  background: rgb(11 18 32 / 0.88);
-  backdrop-filter: blur(8px);
-  border-bottom: 1px solid var(--line);
+  background: rgb(11 18 32 / 0.78);
+  backdrop-filter: blur(10px);
+  border-bottom: 1px solid rgb(92 200 255 / 0.16);
 }
 
 .topbar-inner {
@@ -61,16 +69,19 @@ body {
 .nav a {
   color: var(--muted);
   text-decoration: none;
-  padding: 0.35rem 0.15rem;
+  padding: 0.35rem 0.6rem;
+  border-radius: 999px;
+  transition: background 0.2s ease, color 0.2s ease;
 }
 
 .nav a:hover,
 .nav a[aria-current='page'] {
   color: var(--text);
+  background: rgb(92 200 255 / 0.12);
 }
 
 .hero {
-  padding: 4.8rem 0 2.7rem;
+  padding: 5.2rem 0 3rem;
 }
 
 .hero-grid {
@@ -102,12 +113,16 @@ h1,
 h2,
 h3 {
   margin-top: 0;
-  line-height: 1.2;
+  line-height: 1.18;
 }
 
 h1 {
   font-size: clamp(2rem, 4vw, 3rem);
   margin: 0.5rem 0 0.75rem;
+}
+
+h2 {
+  font-size: clamp(1.45rem, 2.5vw, 2rem);
 }
 
 .lead {
@@ -122,6 +137,12 @@ h1 {
 
 .section-tight {
   margin-top: 1rem;
+}
+
+.section:nth-of-type(even) {
+  background: linear-gradient(180deg, rgb(15 26 47 / 0.22), rgb(15 26 47 / 0));
+  border-top: 1px solid rgb(92 200 255 / 0.08);
+  border-bottom: 1px solid rgb(92 200 255 / 0.06);
 }
 
 .actions {
@@ -139,17 +160,21 @@ h1 {
   text-decoration: none;
   font-weight: 700;
   border-radius: 0.625rem;
-  padding: 0.5rem 0.85rem;
+  padding: 0.56rem 0.92rem;
+  box-shadow: 0 10px 24px var(--glow);
+  transition: transform 0.15s ease, box-shadow 0.2s ease, background 0.2s ease;
 }
 
 .btn:hover {
   background: var(--brand-strong);
+  transform: translateY(-1px);
 }
 
 .btn.secondary {
   background: transparent;
   border-color: var(--line);
   color: var(--text) !important;
+  box-shadow: none;
 }
 
 .grid.two {
@@ -163,6 +188,13 @@ h1 {
   border: 1px solid var(--line);
   border-radius: 0.85rem;
   padding: 1rem 1.1rem;
+  transition: border-color 0.2s ease, transform 0.18s ease, box-shadow 0.2s ease;
+}
+
+.card:hover {
+  border-color: rgb(92 200 255 / 0.42);
+  transform: translateY(-2px);
+  box-shadow: 0 14px 24px rgb(0 0 0 / 0.22);
 }
 
 .image-grid {
@@ -258,17 +290,12 @@ pre {
   color: var(--muted);
 }
 
-.footer a {
-  color: var(--brand);
-  text-decoration: none;
-}
-
-@media (max-width: 900px) {
+@media (max-width: 860px) {
   .hero-grid {
     grid-template-columns: 1fr;
   }
 
-  .hero-image {
-    max-height: 300px;
+  .hero {
+    padding-top: 4.2rem;
   }
 }
