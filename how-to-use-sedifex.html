@@ -1,240 +1,49 @@
 <!doctype html>
 <html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>How to Use Sedifex | Sedifex Developers</title>
-    <link rel="stylesheet" href="styles.css" />
-  </head>
-  <body>
-    <header class="topbar">
-      <div class="container topbar-inner">
-        <a class="brand" href="index.html">developer.sedifex.com</a>
-        <nav class="nav" aria-label="Primary">
-          <a href="quickstart.html">Quickstart</a>
-          <a href="api-reference.html">API Reference</a>
-          <a href="webhooks.html">Webhooks</a>
-          <a href="guides.html">Guides</a>
-          <a href="troubleshooting.html">Troubleshooting</a>
-        </nav>
-      </div>
-    </header>
-
-    <main class="container section prose">
-      <h1>How to Use Sedifex (Current Navigation Guide)</h1>
-      <p>
-        Sedifex is a POS and operations platform for retail and service businesses. This guide
-        reflects the current app navigation and core workflows.
-      </p>
-
-      <h2>Who this guide is for</h2>
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>How to Use Sedifex (Current Navigation Guide)</title>
+  <meta name="description" content="Learn how to use Sedifex with the current navigation structure for owners, staff, POS selling, bookings, customers, SMS, bulk email, and daily operations." />
+  <meta name="keywords" content="Sedifex, how to use Sedifex, Sedifex navigation, Sedifex POS guide, Sedifex bookings, Sedifex customers" />
+  <meta name="robots" content="index,follow,max-snippet:-1,max-image-preview:large,max-video-preview:-1" />
+  <link rel="canonical" href="https://docs.sedifex.com/how-to-use-sedifex.html" />
+</head>
+<body>
+  <header>
+    <h1>How to Use Sedifex (Current Navigation Guide)</h1>
+    <nav aria-label="Primary">
       <ul>
-        <li><strong>Owners/Admins</strong> setting up and managing billing, integrations, and growth channels.</li>
-        <li><strong>Staff/Cashiers</strong> handling sales, customers, bookings, and day-to-day records.</li>
+        <li><a href="index.html">Home</a></li>
+        <li><a href="how-to-use-sedifex.html" aria-current="page">How to Use Sedifex</a></li>
+        <li><a href="integration-api-guide.md">Integration API Guide</a></li>
       </ul>
-
-      <h2>1) Sign in and confirm workspace access</h2>
-      <ol>
-        <li>Open your Sedifex app URL (for example, <code>https://app.sedifex.com</code>).</li>
-        <li>Sign in with your approved account.</li>
-        <li>Confirm your active workspace/store.</li>
-        <li>If you manage multiple stores, switch from the workspace selector before starting work.</li>
-      </ol>
-      <p>If data looks missing after sign-in, confirm you are in the correct workspace and role.</p>
-
-      <h2>2) Understand the current navigation</h2>
-      <h3>Owner navigation</h3>
-      <ul>
-        <li><strong>Dashboard</strong></li>
-        <li><strong>Items</strong></li>
-        <li><strong>Sell</strong></li>
-        <li><strong>Customers</strong></li>
-        <li><strong>Bookings</strong></li>
-        <li><strong>Blog</strong></li>
-        <li><strong>SMS</strong></li>
-        <li><strong>Bulk email</strong></li>
-        <li><strong>Business records</strong></li>
-        <li><strong>Public page</strong></li>
-        <li><strong>Account</strong></li>
-      </ul>
-
-      <h3>Staff navigation</h3>
-      <ul>
-        <li><strong>Sell</strong></li>
-        <li><strong>Customers</strong></li>
-        <li><strong>Bookings</strong></li>
-        <li><strong>Blog</strong></li>
-        <li><strong>Business records</strong></li>
-      </ul>
-      <p><em>Note:</em> Navigation is role-based, so owners and staff do not see the same sections.</p>
-
-      <h2>3) Dashboard (owner)</h2>
-      <p>Use <strong>Dashboard</strong> for an at-a-glance view of sales, performance trends, and priorities.</p>
-      <p>Typical use:</p>
-      <ul>
-        <li>Review today’s performance snapshot.</li>
-        <li>Check progress against recent periods.</li>
-        <li>Jump quickly to items, SMS, and other actions.</li>
-      </ul>
-      <p>Start each day here to set priorities.</p>
-
-      <h2>4) Items</h2>
-      <p>Use <strong>Items</strong> to manage your product/service catalog.</p>
-      <p>Common tasks:</p>
-      <ul>
-        <li>Add or edit item name, category, price, and stock.</li>
-        <li>Maintain barcode/SKU values for quick selling.</li>
-        <li>Keep descriptions/images clean for team clarity and customer receipts.</li>
-      </ul>
-      <p>Tip: Set a consistent naming convention (size/unit/variant format).</p>
-
-      <h2>5) Sell</h2>
-      <p>Use <strong>Sell</strong> for checkout and transaction processing.</p>
-      <p>Typical flow:</p>
-      <ol>
-        <li>Search or scan item.</li>
-        <li>Add to cart and adjust quantity.</li>
-        <li>Confirm totals/discounts.</li>
-        <li>Select payment method.</li>
-        <li>Complete sale and issue receipt.</li>
-      </ol>
-      <p>Also available from Sell:</p>
-      <ul>
-        <li><strong>Close day</strong>: daily reconciliation and shift close checks.</li>
-        <li><strong>Invoice</strong>: owner invoice generation and sharing for customers who need formal billing.</li>
-      </ul>
-
-      <h2>6) Customers</h2>
-      <p>Use <strong>Customers</strong> to build and maintain customer records.</p>
-      <ul>
-        <li>Add and update customer profiles.</li>
-        <li>Link customers to sales and follow-ups.</li>
-        <li>Improve delivery, reminders, and campaign targeting quality.</li>
-      </ul>
-      <p>Accurate contact data reduces failed communication.</p>
-
-      <h2>7) Bookings</h2>
-      <p>Use <strong>Bookings</strong> for appointment and schedule management.</p>
-      <ul>
-        <li>Create bookings.</li>
-        <li>Update booking statuses.</li>
-        <li>Keep customer notes and timing accurate for team handoffs.</li>
-      </ul>
-      <p>Consistent status updates improve service reliability.</p>
-
-      <h2>8) Blog</h2>
-      <p>Use <strong>Blog</strong> to publish content and promotions tied to your store.</p>
-      <p>Common uses:</p>
-      <ul>
-        <li>Share offers and updates.</li>
-        <li>Publish featured products.</li>
-        <li>Keep your public-facing content fresh.</li>
-      </ul>
-      <p>When available, use product-linked imagery to speed up post creation.</p>
-
-      <h2>9) SMS</h2>
-      <p>Use <strong>SMS</strong> for targeted customer outreach.</p>
-      <p>Best practices:</p>
-      <ul>
-        <li>Segment recipients before sending.</li>
-        <li>Keep messages short and clear.</li>
-        <li>Check estimated usage/credits before launch.</li>
-        <li>Avoid duplicate campaigns.</li>
-      </ul>
-
-      <h2>10) Bulk email</h2>
-      <p>Use <strong>Bulk email</strong> for longer-form campaigns and announcements.</p>
-      <p>Typical workflow:</p>
-      <ul>
-        <li>Prepare audience and subject.</li>
-        <li>Draft campaign content.</li>
-        <li>Verify sender/delivery setup in <strong>Account → Integrations</strong>.</li>
-        <li>Send and monitor response.</li>
-      </ul>
-      <p>Use email for richer content and SMS for urgent/short reminders.</p>
-
-      <h2>11) Business records</h2>
-      <p>Use <strong>Business records</strong> to manage business income/expense records.</p>
-      <p>Typical uses:</p>
-      <ul>
-        <li>Log business expenses with meaningful labels.</li>
-        <li>Keep records current for reporting and reviews.</li>
-        <li>Support profit tracking alongside sales.</li>
-      </ul>
-      <p>Update records daily to avoid end-of-month backlogs.</p>
-
-      <h2>12) Public page</h2>
-      <p>Use <strong>Public page</strong> to manage your customer-facing store profile.</p>
-      <p>Update regularly:</p>
-      <ul>
-        <li>Store details and contact channels.</li>
-        <li>Public catalog visibility.</li>
-        <li>Promotions and brand content.</li>
-      </ul>
-      <p>Keep this page current so customers see accurate information.</p>
-
-      <h2>13) Account (owner)</h2>
-      <p>Use <strong>Account</strong> for workspace controls and setup.</p>
-      <p>Typical tasks:</p>
-      <ul>
-        <li>Billing/subscription management.</li>
-        <li>Integrations and API keys.</li>
-        <li>Team/workspace configuration and security settings.</li>
-        <li>Email delivery and other channel setup.</li>
-      </ul>
-      <p>Review account settings weekly.</p>
-
-      <h2>14) Daily operating checklist</h2>
-      <h3>Start of day</h3>
-      <ul>
-        <li>Confirm internet/device readiness.</li>
-        <li>Review <strong>Dashboard</strong> (owner) or pending tasks (staff).</li>
-        <li>Check critical stock in <strong>Items</strong>.</li>
-        <li>Confirm cashier/staff access.</li>
-      </ul>
-
-      <h3>During operations</h3>
-      <ul>
-        <li>Process transactions in <strong>Sell</strong>.</li>
-        <li>Keep customer records current.</li>
-        <li>Update <strong>Bookings</strong> statuses in real time.</li>
-        <li>Log expenses in <strong>Business records</strong>.</li>
-      </ul>
-
-      <h3>End of day</h3>
-      <ul>
-        <li>Run <strong>Close day</strong> checks.</li>
-        <li>Review pending invoices.</li>
-        <li>Complete priority SMS/email follow-ups.</li>
-        <li>Confirm important public updates are live.</li>
-      </ul>
-
-      <h2>15) Quick troubleshooting</h2>
-      <h3>“I can’t find Product tab”</h3>
-      <p>It is now <strong>Items</strong>.</p>
-
-      <h3>“I can’t find invoice”</h3>
-      <p>Open <strong>Sell</strong> and use the <strong>Invoice</strong> option.</p>
-
-      <h3>“My navigation looks different”</h3>
-      <p>Your account role controls which pages are visible.</p>
-
-      <h3>“Campaign sending is blocked”</h3>
-      <p>
-        Check credits (SMS) and integration setup in <strong>Account → Integrations</strong>
-        (email/SMS-related services).
-      </p>
-
-      <h3>“My public details are wrong”</h3>
-      <p>Update in <strong>Public page</strong>, then confirm your changes were saved/published.</p>
-
-      <h2>Related docs</h2>
-      <ul>
-        <li>Main setup: <code>README.md</code></li>
-        <li>Integration API guide: <code>docs/integration-api-guide.md</code></li>
-        <li>Checkout preview contract: <code>docs/checkout-preview-reference.md</code></li>
-        <li>Webhook signatures: <code>docs/webhooks-signature-verification.md</code></li>
-      </ul>
-    </main>
-  </body>
+    </nav>
+    <p>Sedifex is a POS and operations platform for retail and service businesses. This guide reflects the current app navigation and core workflows.</p>
+  </header>
+  <main>
+    <h2>Who this guide is for</h2>
+    <ul><li><strong>Owners/Admins</strong> setting up and managing billing, integrations, and growth channels.</li><li><strong>Staff/Cashiers</strong> handling sales, customers, bookings, and day-to-day records.</li></ul>
+    <h2>1) Sign in and confirm workspace access</h2><ol><li>Open your Sedifex app URL (for example, <code>https://app.sedifex.com</code>).</li><li>Sign in with your approved account.</li><li>Confirm your active workspace/store.</li><li>If you manage multiple stores, switch from the workspace selector before starting work.</li></ol>
+    <p>If data looks missing after sign-in, confirm you are in the correct workspace and role.</p>
+    <h2>2) Understand the current navigation</h2>
+    <h3>Owner navigation</h3><ul><li>Dashboard</li><li>Items</li><li>Sell</li><li>Customers</li><li>Bookings</li><li>Blog</li><li>SMS</li><li>Bulk email</li><li>Business records</li><li>Public page</li><li>Account</li></ul>
+    <h3>Staff navigation</h3><ul><li>Sell</li><li>Customers</li><li>Bookings</li><li>Blog</li><li>Business records</li></ul>
+    <p><em>Note: Navigation is role-based, so owners and staff do not see the same sections.</em></p>
+    <h2>3) Dashboard (owner)</h2><p>Use Dashboard for an at-a-glance view of sales, performance trends, and priorities.</p>
+    <h2>4) Items</h2><p>Use Items to manage your product/service catalog.</p>
+    <h2>5) Sell</h2><p>Use Sell for checkout and transaction processing, including Close day and Invoice options.</p>
+    <h2>6) Customers</h2><p>Use Customers to build and maintain customer records.</p>
+    <h2>7) Bookings</h2><p>Use Bookings for appointment and schedule management.</p>
+    <h2>8) Blog</h2><p>Use Blog to publish content and promotions tied to your store.</p>
+    <h2>9) SMS</h2><p>Use SMS for targeted customer outreach.</p>
+    <h2>10) Bulk email</h2><p>Use Bulk email for longer-form campaigns and announcements.</p>
+    <h2>11) Business records</h2><p>Use Business records to manage business income/expense records.</p>
+    <h2>12) Public page</h2><p>Use Public page to manage your customer-facing store profile.</p>
+    <h2>13) Account (owner)</h2><p>Use Account for workspace controls and setup.</p>
+    <h2>14) Daily operating checklist</h2><h3>Start of day</h3><ul><li>Confirm internet/device readiness.</li><li>Review Dashboard (owner) or pending tasks (staff).</li><li>Check critical stock in Items.</li><li>Confirm cashier/staff access.</li></ul><h3>During operations</h3><ul><li>Process transactions in Sell.</li><li>Keep customer records current.</li><li>Update Bookings statuses in real time.</li><li>Log expenses in Business records.</li></ul><h3>End of day</h3><ul><li>Run Close day checks.</li><li>Review pending invoices.</li><li>Complete priority SMS/email follow-ups.</li><li>Confirm important public updates are live.</li></ul>
+    <h2>15) Quick troubleshooting</h2><h3>I can’t find Product tab</h3><p>It is now Items.</p><h3>I can’t find invoice</h3><p>Open Sell and use the Invoice option.</p><h3>My navigation looks different</h3><p>Your account role controls which pages are visible.</p><h3>Campaign sending is blocked</h3><p>Check credits (SMS) and integration setup in Account → Integrations.</p><h3>My public details are wrong</h3><p>Update in Public page, then confirm your changes were saved/published.</p>
+    <h2>Related docs</h2><ul><li>Main setup: <code>README.md</code></li><li>Integration API guide: <code>integration-api-guide.md</code></li></ul>
+  </main>
+</body>
 </html>
