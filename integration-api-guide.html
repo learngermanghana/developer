@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Sedifex Integration API Guide</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <header>
+    <h1>Sedifex Integration API Guide (v1)</h1>
+    <nav>
+      <a href="index.html">Home</a>
+      <a href="how-to-use-sedifex.html">Navigation Guide</a>
+      <a href="integration-api-guide.html">Integration API Guide</a>
+    </nav>
+  </header>
+
+  <main>
+    <h2>Authentication and API keys</h2>
+    <p>Set integration credentials server-side and send <code>x-api-key</code> and <code>X-Sedifex-Contract-Version</code> headers on authenticated calls.</p>
+
+    <h2>Contract version</h2>
+    <p>Current contract version: <strong>2026-04-13</strong>.</p>
+
+    <h2>Endpoint behavior</h2>
+    <p><code>GET /v1/products</code> supports sorting, paging, and per-store balancing (with <code>maxPerStore</code>).</p>
+
+    <p>For full API details and response examples, view <a href="integration-api-guide.md">integration-api-guide.md</a>.</p>
+  </main>
+</body>
+</html>
