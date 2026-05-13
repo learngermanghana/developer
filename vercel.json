@@ -13,14 +13,4 @@
       ]
     }
   ],
-  "rewrites": [
-    {
-      "source": "/integration-api-guide",
-      "destination": "/integration-api-guide.md"
-    },
-    {
-      "source": "/integration-api-guide/",
-      "destination": "/integration-api-guide.md"
-    }
-  ]
-}
+
