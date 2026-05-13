@@ -4,9 +4,10 @@
   "version": "1.0.0",
   "description": "Static Sedifex developer docs site",
   "scripts": {
-    "build": "rm -rf public && mkdir -p public && cp -r *.html *.css *.txt *.xml public/ && echo 'Static site ready for Vercel (output: public/)'",
+    "build": "npm run generate-sitemap && rm -rf public && mkdir -p public && cp -r *.html *.css *.txt *.xml public/ && echo 'Static site ready for Vercel (output: public/)'",
     "vercel-build": "npm run build",
-    "start": "npx serve . -l 3000"
+    "start": "npx serve . -l 3000",
+    "generate-sitemap": "node scripts/generate-sitemap.mjs"
   },
   "devDependencies": {
     "serve": "^14.2.3"
