@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Integration API Guide | Sedifex</title>
+  <meta name="description" content="Integration API guide for Sedifex, including auth, webhook flow, and endpoint structure." />
+  <meta name="robots" content="index,follow" />
+</head>
+<body>
+  <header>
+    <h1>Integration API Guide</h1>
+    <nav aria-label="Primary">
+      <ul>
+        <li><a href="index.html">Home</a></li>
+        <li><a href="how-to-use-sedifex.html">How to Use Sedifex</a></li>
+        <li><a href="integration-api-guide.html" aria-current="page">Integration API Guide</a></li>
+      </ul>
+    </nav>
+  </header>
+
+  <main>
+    <h2>Overview</h2>
+    <p>
+      Use this guide to connect Sedifex to websites, automation services, and internal systems.
+    </p>
+
+    <h2>Typical integration flow</h2>
+    <ol>
+      <li>Generate API credentials in your Sedifex account.</li>
+      <li>Send authenticated requests to Sedifex endpoints.</li>
+      <li>Receive webhook events in your backend.</li>
+      <li>Store and sync booking/customer/payment updates in your own systems.</li>
+    </ol>
+
+    <h2>Best practices</h2>
+    <ul>
+      <li>Keep API keys in server-side secrets only.</li>
+      <li>Verify webhook signatures before processing.</li>
+      <li>Use idempotency keys and retry-safe handlers.</li>
+    </ul>
+  </main>
+</body>
+</html>
