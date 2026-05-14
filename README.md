@@ -1,36 +1,97 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Sedifex Developer Portal
 
-## Getting Started.
+Sedifex Developer Portal is a Next.js (App Router) site that publishes developer-facing integration docs, tutorials, and starter-kit information from the repository's local `docs/` content files.
 
-First, run the development server:
+## What this project is
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+- **Product surface:** Public-facing documentation experience for Sedifex developers.
+- **Primary sections:** Home, Documentation, Tutorials, Starters, Partners, and Earn pages.
+- **Content source of truth:** Markdown/MDX/PHP files under `docs/` are parsed and rendered into the docs UI.
+
+## Tech stack
+
+- Next.js 16 (App Router)
+- React 19
+- TypeScript
+- Tailwind CSS 4
+- Markdown pipeline: `gray-matter`, `react-markdown`, `remark-gfm`, `rehype-slug`, `rehype-autolink-headings`
+
+## Project structure
+
+```text
+app/                   # Canonical Next.js App Router tree
+  docs/                # Docs index + dynamic doc routes
+  tutorials/           # Curated tutorial pages pulled from docs/
+  starters/            # Starter kit catalog page
+  partners/            # Partner information page
+  earn/                # Monetization/earn page
+src/
+  components/          # Reusable UI for docs rendering/navigation
+  lib/docs.ts          # Local docs discovery + parsing utilities
+docs/                  # Source content rendered by the portal
+public/                # Static assets
+scripts/generate-sitemap.mjs
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## Local development
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+### Prerequisites
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+- Node.js 20+
+- npm 10+
 
-## Learn More
+### Install and run
 
-To learn more about Next.js, take a look at the following resources:
+```bash
+npm install
+npm run dev
+```
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+Open <http://localhost:3000>.
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+## Content authoring workflow
 
-## Deploy on Vercel
+All documentation content lives in `docs/`.
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+### Add a new document
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+1. Create a `.md`, `.mdx`, or `.php` file in `docs/` (nested folders supported).
+2. Recommended frontmatter:
+
+```md
+---
+title: Your page title
+description: One-line summary for cards and metadata.
+---
+```
+
+3. Save and refresh. The portal auto-discovers the file and exposes it under `/docs/<slug>`.
+
+### Slug behavior
+
+- `docs/integration-api-guide.md` → `/docs/integration-api-guide`
+- `docs/guides/payments/stripe.md` → `/docs/guides/payments/stripe`
+- `.php` files are rendered as code blocks for reference.
+
+### Tutorials curation
+
+`/tutorials` currently embeds selected docs by slug. Update `embeddedDocs` in `app/tutorials/page.tsx` to change which docs appear there.
+
+## Build, lint, and production run
+
+```bash
+npm run lint
+npm run build
+npm run start
+```
+
+## Deployment notes
+
+- This app is compatible with standard Next.js deployments (for example Vercel or containerized Node hosting).
+- Ensure the `docs/` directory is included in deployment artifacts, since docs are read from the local filesystem at runtime/build time.
+
+## Docs maintenance checklist
+
+- Keep document titles/descriptions present and concise.
+- Prefer one topic per file to keep navigation predictable.
+- When adding new integration guides, verify they appear in `/docs` and deep links resolve correctly.
