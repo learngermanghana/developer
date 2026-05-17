@@ -1,93 +1,127 @@
-# Checkout Preview Reference (Sedifex API ↔ Website)
+# Checkout Preview Reference (Sedifex API ↔ Client Website)
 
-This document is the reference for how marketplace websites (for example, `sedifexmarket.com`) should compute checkout totals with Sedifex.
+This document explains how a client website should request a trusted checkout preview from Sedifex before creating payment.
 
-## Shared contract
+## Purpose
 
-### Endpoint
+The browser cart can show an estimated subtotal, but the trusted total should come from Sedifex/backend logic before payment.
 
-`POST /integration/checkout/preview`
+Use checkout preview when you need to show:
 
-### Request (Site ➜ Sedifex)
+- item subtotal
+- service fee / transfer fee
+- final customer total
+- store amount
+- validation errors before payment
+
+## Endpoint
+
+```txt
+POST /integration/checkout/preview
+```
+
+Send the request from your website backend, not directly from the browser.
+
+## Required headers
+
+```http
+x-api-key: <integration_key>
+X-Sedifex-Contract-Version: 2026-04-13
+Content-Type: application/json
+Accept: application/json
+```
+
+## Request example
 
 ```json
 {
-  "merchant_id": "m_123",
+  "storeId": "store_123",
+  "merchantId": "store_123",
   "currency": "GHS",
-  "fulfillment_type": "PICKUP",
-  "delivery_address_id": null,
+  "fulfillment_type": "DELIVERY",
   "items": [
-    { "type": "PRODUCT", "item_id": "p_1", "qty": 2 },
-    { "type": "SERVICE", "item_id": "s_7", "qty": 1 }
-  ]
+    {
+      "type": "PRODUCT",
+      "item_type": "product",
+      "item_id": "product_1",
+      "qty": 2
+    }
+  ],
+  "customer": {
+    "name": "Customer Name",
+    "email": "customer@example.com",
+    "phone": "+233200000000"
+  },
+  "delivery": {
+    "location": "Tema Community 25",
+    "notes": "Call before delivery"
+  },
+  "sourceChannel": "client_website",
+  "sourceLabel": "Client Website"
 }
 ```
 
-### Response (Sedifex ➜ Site)
+## Response example
 
 ```json
 {
-  "pricing_version": "2026-05-12-v1",
-  "subtotal": 25000,
-  "tax_total": 1875,
-  "delivery_fee": 0,
-  "pre_processing_total": 26875,
-  "processing_fee_to_add": 450,
-  "final_total": 27325,
-  "breakdown": [
-    { "code": "SUBTOTAL", "amount": 25000 },
-    { "code": "TAX", "amount": 1875 },
-    { "code": "DELIVERY", "amount": 0 },
-    { "code": "PROCESSING_FEE", "amount": 450 }
+  "ok": true,
+  "currency": "GHS",
+  "subtotal": 200,
+  "transferFee": 3.9,
+  "customerTotal": 203.9,
+  "sedifexServiceFee": 6,
+  "storeReceives": 194,
+  "items": [
+    {
+      "item_id": "product_1",
+      "name": "Product name",
+      "qty": 2,
+      "unitPrice": 100,
+      "lineTotal": 200
+    }
   ]
 }
 ```
 
-> Amounts are always minor units (pesewas/kobo) and always integers.
+## Validation rules
 
-## Required field names
+Your website backend should validate these before calling preview:
 
-Use these names exactly in code and payloads:
+- `storeId` is configured.
+- Integration key exists server-side.
+- Cart is not empty.
+- Quantity is at least `1`.
+- Item IDs are raw Sedifex IDs, not display IDs with extra prefixes.
+- Customer phone/email format is reasonable.
 
-- `fulfillment_type` (`PICKUP | DELIVERY`)
-- `subtotal`
-- `tax_total`
-- `delivery_fee`
-- `pre_processing_total`
-- `processing_fee_to_add`
-- `final_total`
-- `pricing_snapshot`
-- `payment_reference`
-- `payment_status`
-- `order_status`
+## ID normalization reminder
 
-## Multi-merchant marketplace behavior (`sedifexmarket.com`)
+If your frontend display ID includes a store prefix, remove it before sending checkout data to Sedifex.
 
-For a public product feed that lists products from many shops:
+```ts
+function normalizeSedifexItemId(rawId: string, storeId: string) {
+  const id = rawId.trim()
+  const prefix = `${storeId}_`
+  return storeId && id.startsWith(prefix) ? id.slice(prefix.length) : id
+}
+```
 
-1. Cart must be grouped by merchant/store.
-2. One checkout preview call per merchant cart.
-3. Do not mix different `merchant_id` values in one preview/order.
-4. Use merchant-scoped integration auth.
+## Recommended flow
 
-## Merchant setup checklist
+```txt
+Customer cart
+  -> website backend validates cart
+  -> website backend calls Sedifex checkout preview
+  -> website shows trusted total
+  -> customer confirms
+  -> website backend calls checkout create
+  -> customer pays
+  -> Sedifex records order/payment state
+```
 
-Each merchant/shop should configure in Sedifex:
+## Related docs
 
-1. Published products/services.
-2. Fulfillment options (`PICKUP`/`DELIVERY`).
-3. Tax rules.
-4. Delivery fee rules.
-5. Processing fee rule.
-6. Integration token for their website/marketplace connector.
-
-## Order lifecycle fields
-
-After a preview is accepted by buyer:
-
-- Persist `pricing_snapshot` from preview response.
-- Create payment and store `payment_reference`.
-- Keep payment state in `payment_status` (`pending`, `paid`, etc.).
-- Keep fulfillment/order state in `order_status` (`pending`, `processing`, `completed`, etc.).
-
-This prevents drift if prices/rules change later.
+- `docs/client-website-cart-design-guide.md`
+- `docs/paystack-split-checkout-url.md`
+- `docs/integration-api-guide.md`
