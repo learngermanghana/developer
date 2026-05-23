@@ -1,261 +1,268 @@
-# How to Use Sedifex (Current Navigation Guide)
+# How to Use Sedifex
 
-Sedifex is a POS and operations platform for retail and service businesses. This guide reflects the current app navigation and core workflows.
+Canonical onboarding URL: `/docs/how-to-use-sedifex`
 
-## Who this guide is for
+Sedifex now works as a flexible business workspace. Each business can enable the tools it needs instead of using one fixed menu for every industry.
 
-- **Owners/Admins** setting up and managing billing, integrations, and growth channels.
-- **Staff/Cashiers** handling sales, customers, bookings, and day-to-day records.
+The new interface focuses on five daily actions:
 
----
-
-## 1) Sign in and confirm workspace access
-
-1. Open your Sedifex app URL (for example, `https://app.sedifex.com`).
-2. Sign in with your approved account.
-3. Confirm your active workspace/store.
-4. If you manage multiple stores, switch from the workspace selector before starting work.
-
-If data looks missing after sign-in, confirm you are in the correct workspace and role.
+1. Add the business data.
+2. Sell or receive payment.
+3. Build a website from Sedifex data.
+4. Connect the website/API integrations.
+5. Track bookings, orders, customers, reports, and payments from one place.
 
 ---
 
-## 2) Understand the current navigation
+## 1. New navigation model
 
-### Owner navigation
+Sedifex navigation is module-based. The workspace owner can choose the modules that matter for the business.
 
-- **Dashboard**
-- **Items**
-- **Sell**
-- **Customers**
-- **Bookings**
-- **Blog**
-- **SMS**
-- **Bulk email**
-- **Business records**
-- **Public page**
-- **Account**
+Core modules now include:
 
-### Staff navigation
-
-- **Sell**
-- **Customers**
-- **Bookings**
-- **Blog**
-- **Business records**
-
-> Note: Navigation is role-based, so owners and staff do not see the same sections.
-
----
-
-## 3) Dashboard (owner)
-
-Use **Dashboard** for an at-a-glance view of sales, performance trends, and priorities.
-
-Typical use:
-
-- Review today’s performance snapshot.
-- Check progress against recent periods.
-- Jump quickly to items, SMS, and other actions.
-
-Start each day here to set priorities.
+| Module | Use it for |
+|---|---|
+| **Dashboard** | Quick business summary and daily overview |
+| **Reports** | Sales, booking, website sales, settlement, donor, funds, and other reports |
+| **Items** | Products, services, courses, and catalog records |
+| **Sell** | POS sales, invoices, receipts, and checkout work |
+| **Quick Pay** | Simple public payment/search page where customers can find the store and pay quickly |
+| **Invoices** | Create and manage invoices |
+| **Receipts** | Create and manage receipts |
+| **Customers** | Customer/contact records |
+| **Students** | School-specific student records |
+| **Bookings** | Service bookings, appointments, trips, classes, or campaigns depending on industry |
+| **Upcoming events** | Availability, classes, trips, campaigns, appointments, and event schedules |
+| **Student registration** | School/course registration records |
+| **Volunteers** | NGO volunteer applications |
+| **Support requests** | NGO/community support request records |
+| **Payments / Settlement** | Payment and settlement tracking |
+| **Integrations** | Website/API key, products/services API, booking API, Apps Script, and email settings |
+| **Blog** | Store or business blog posts |
+| **Promo** | Promo/landing page content |
+| **Gallery** | Website/public gallery images and albums |
+| **Social links** | Website contact links, WhatsApp, social pages, and public profile links |
+| **Website Builder** | Build a website from Sedifex data without coding |
+| **SMS** | Bulk SMS or customer messaging |
+| **Bulk email** | Email marketing and customer updates |
+| **Donor management** | Donations, expenses, donor records, and NGO-style finance tracking |
+| **Funds ledger** | Funds and ledger tracking |
+| **Account** | Workspace, staff, billing, navigation, and setup settings |
 
 ---
 
-## 4) Items
+## 2. Industry presets and labels
 
-Use **Items** to manage your product/service catalog.
+Sedifex can use the same core modules but rename them based on industry.
 
-Common tasks:
+| Industry | Common navigation meaning |
+|---|---|
+| **Shop** | Items, Sell, Quick Pay, Customers, Bookings, Website Builder, Reports |
+| **Travel** | Trips, Travelers, Upcoming trips, Trip promos, Trip gallery, Contact links |
+| **NGO** | Donors, Campaigns, Upcoming campaigns, Volunteers, Support requests, Impact gallery |
+| **School** | Students, Classes, Upcoming classes, Student registration, Admissions promo, School gallery |
 
-- Add or edit item name, category, price, and stock.
-- Maintain barcode/SKU values for quick selling.
-- Keep descriptions/images clean for team clarity and customer receipts.
-
-Tip: Set a consistent naming convention (size/unit/variant format).
-
----
-
-## 5) Sell
-
-Use **Sell** for checkout and transaction processing.
-
-Typical flow:
-
-1. Search or scan item.
-2. Add to cart and adjust quantity.
-3. Confirm totals/discounts.
-4. Select payment method.
-5. Complete sale and issue receipt.
-
-Also available from Sell:
-
-- **Close day**: daily reconciliation and shift close checks.
-- **Invoice**: owner invoice generation and sharing for customers who need formal billing.
+Example: the same **Bookings** system may appear as **Trips** for travel, **Campaigns** for NGO, or **Classes** for school.
 
 ---
 
-## 6) Customers
+## 3. Role-based access
 
-Use **Customers** to build and maintain customer records.
+### Owner
 
-- Add and update customer profiles.
-- Link customers to sales and follow-ups.
-- Improve delivery, reminders, and campaign targeting quality.
+Owners can normally manage the full workspace:
 
-Accurate contact data reduces failed communication.
+- Dashboard
+- Reports
+- Items
+- Sell
+- Quick Pay
+- Invoices
+- Receipts
+- Customers / industry aliases
+- Students where enabled
+- Bookings / Trips / Classes / Campaigns
+- Upcoming events
+- Payments / Settlement
+- Integrations
+- Blog
+- Promo
+- Gallery
+- Social links
+- Website Builder
+- SMS
+- Bulk email
+- Donor management
+- Funds ledger
+- Account and staff settings
 
----
+### Staff
 
-## 7) Bookings
+Staff usually work with daily operations:
 
-Use **Bookings** for appointment and schedule management.
+- Reports
+- Sell
+- Quick Pay
+- Invoices
+- Receipts
+- Customers / industry aliases
+- Bookings / industry aliases
+- Upcoming events
+- Blog
+- Promo
+- Gallery
+- Donor management where enabled
 
-- Create bookings.
-- Update booking statuses.
-- Keep customer notes and timing accurate for team handoffs.
-
-Consistent status updates improve service reliability.
-
----
-
-## 8) Blog
-
-Use **Blog** to publish content and promotions tied to your store.
-
-Common uses:
-
-- Share offers and updates.
-- Publish featured products.
-- Keep your public-facing content fresh.
-
-When available, use product-linked imagery to speed up post creation.
-
----
-
-## 9) SMS
-
-Use **SMS** for targeted customer outreach.
-
-Best practices:
-
-- Segment recipients before sending.
-- Keep messages short and clear.
-- Check estimated usage/credits before launch.
-- Avoid duplicate campaigns.
-
----
-
-## 10) Bulk email
-
-Use **Bulk email** for longer-form campaigns and announcements.
-
-Typical workflow:
-
-- Prepare audience and subject.
-- Draft campaign content.
-- Verify sender/delivery setup in **Account → Integrations**.
-- Send and monitor response.
-
-Use email for richer content and SMS for urgent/short reminders.
+The owner can adjust modules and permissions from the workspace settings.
 
 ---
 
-## 11) Business records
+## 4. Recommended onboarding flow
 
-Use **Business records** to manage business income/expense records.
+### Step 1: Confirm workspace setup
 
-Typical uses:
+Go to **Account** and confirm:
 
-- Log business expenses with meaningful labels.
-- Keep records current for reporting and reviews.
-- Support profit tracking alongside sales.
+- workspace/business name
+- staff access
+- billing/contract status
+- navigation modules
+- industry preset
+- public profile/contact details
 
-Update records daily to avoid end-of-month backlogs.
+### Step 2: Add items and services
 
----
+Go to **Items** and add what the business offers:
 
-## 12) Public page
+- products
+- services
+- courses
+- classes
+- consultation packages
+- appointment-based services
 
-Use **Public page** to manage your customer-facing store profile.
+These records can power the dashboard, website, Quick Pay, booking forms, checkout, and public catalog.
 
-Update regularly:
+### Step 3: Set up Quick Pay
 
-- Store details and contact channels.
-- Public catalog visibility.
-- Promotions and brand content.
+Go to **Quick Pay** when the business needs a simple way for customers to search the store and pay.
 
-Keep this page current so customers see accurate information.
+Quick Pay is useful for:
 
----
+- sharing a payment link on WhatsApp, Instagram, TikTok, or flyers
+- letting customers search the store name
+- displaying products/services connected to the store
+- collecting payment quickly
+- giving the customer a receipt
+- keeping store records updated
 
-## 13) Account (owner)
+### Step 4: Build the website
 
-Use **Account** for workspace controls and setup.
+Go to **Website Builder** to build a website from Sedifex data.
 
-Typical tasks:
+The Website Builder can use:
 
-- Billing/subscription management.
-- Integrations and API keys.
-- Team/workspace configuration and security settings.
-- Email delivery and other channel setup.
+- products/services from Items
+- gallery images
+- promo content
+- blog posts
+- social links
+- contact details
+- booking/payment actions
 
-Review account settings weekly.
+This means the business can update Sedifex once and let the website pull the latest data.
 
----
+### Step 5: Configure integrations
 
-## 14) Daily operating checklist
+Go to **Integrations** to connect external websites and tools.
 
-### Start of day
+Use this page for:
 
-- Confirm internet/device readiness.
-- Review **Dashboard** (owner) or pending tasks (staff).
-- Check critical stock in **Items**.
-- Confirm cashier/staff access.
+- one Website Integration API key
+- products/services API endpoint
+- booking API endpoint
+- availability endpoint
+- gallery endpoint
+- checkout settings
+- booking sheet sync
+- email Apps Script setup
 
-### During operations
+Important: new websites should use **one Website Integration API key** for products/services, bookings, availability, and checkout.
 
-- Process transactions in **Sell**.
-- Keep customer records current.
-- Update **Bookings** statuses in real time.
-- Log expenses in **Business records**.
+### Step 6: Track bookings and orders
 
-### End of day
+Use:
 
-- Run **Close day** checks.
-- Review pending invoices.
-- Complete priority SMS/email follow-ups.
-- Confirm important public updates are live.
-
----
-
-## 15) Quick troubleshooting
-
-### “I can’t find Product tab”
-
-It is now **Items**.
-
-### “I can’t find invoice”
-
-Open **Sell** and use the **Invoice** option.
-
-### “My navigation looks different”
-
-Your account role controls which pages are visible.
-
-### “Campaign sending is blocked”
-
-Check credits (SMS) and integration setup in **Account → Integrations** (email/SMS-related services).
-
-### “My public details are wrong”
-
-Update in **Public page**, then confirm your changes were saved/published.
+- **Bookings** for services, appointments, trips, classes, consultations, and campaigns
+- **Upcoming events** for availability, schedules, intakes, classes, trips, and events
+- **Online Orders** for website/marketplace product orders
+- **Reports** for audit, sales, bookings, website sales, settlement, donors, and funds
 
 ---
 
-## Related docs
+## 5. Daily workflow examples
 
-- Main setup: `README.md`
-- Integration API guide: `docs/integration-api-guide.md`
-- Checkout preview contract: `docs/checkout-preview-reference.md`
-- Webhook signatures: `docs/webhooks-signature-verification.md`
+### Shop workflow
+
+1. Add products/services in **Items**.
+2. Sell in **Sell** or share **Quick Pay**.
+3. Build a website with **Website Builder**.
+4. Connect the website from **Integrations**.
+5. Track customers, orders, receipts, and reports.
+
+### Travel workflow
+
+1. Add travel services/packages in **Items**.
+2. Use **Bookings/Trips** for customer travel requests.
+3. Use **Upcoming events/trips** for travel dates or appointment slots.
+4. Use **Promo**, **Gallery**, and **Social links** for public marketing.
+5. Connect the travel website from **Integrations**.
+
+### School workflow
+
+1. Add courses/classes in **Items**.
+2. Use **Student registration** for new student signups.
+3. Use **Bookings/Classes** and **Upcoming classes** for scheduled lessons.
+4. Use **Bulk email** and **SMS** for student communication.
+5. Use **Website Builder** and **Integrations** to publish course data online.
+
+### NGO workflow
+
+1. Add campaigns or support services in **Items**.
+2. Use **Donor management** and **Funds ledger** for finance tracking.
+3. Use **Volunteers** and **Support requests** for public intake.
+4. Use **Campaigns**, **Upcoming campaigns**, **Promo**, and **Impact gallery** for public updates.
+5. Connect donation/volunteer pages through **Integrations**.
+
+---
+
+## 6. Key notes for the new interface
+
+- **Items** is the source for products, services, courses, and catalog records.
+- **Quick Pay** is for fast public payments and payment links.
+- **Website Builder** creates a website using Sedifex data.
+- **Integrations** connects external websites, product/service feeds, booking forms, checkout, gallery, and email tools.
+- **Bookings** should be used for appointments, services, classes, trips, campaigns, and consultations.
+- **Online Orders** should be used for product purchases and checkout orders.
+- **Navigation settings** allow the workspace to show only the modules the business needs.
+- Industry aliases can rename modules without changing the core data model.
+
+---
+
+## 7. Why this page exists
+
+- Shareable onboarding note for new Sedifex users.
+- Clear explanation of the new navigation and module system.
+- Helps staff understand where to go for website builder, Quick Pay, integrations, bookings, and reports.
+- Crawlable URL for search engines and AI assistants.
+- Single source of truth for changing Sedifex navigation patterns.
+
+---
+
+## 8. Related docs
+
+- `/docs/integration-api-guide.md`
+- `/docs/integration-quickstart`
+- `/docs/wordpress-install-guide`
+- `/docs/bulk-email-google-sheets-guide`
+- `/docs/donor-website-integration`
