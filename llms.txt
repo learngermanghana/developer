@@ -9,6 +9,7 @@
 - Webhooks: https://developer.sedifex.com/webhooks.html
 - Guides: https://developer.sedifex.com/guides.html
 - Troubleshooting: https://developer.sedifex.com/troubleshooting.html
+- Event Planning & Client Collaboration: https://developer.sedifex.com/docs/event-planning-client-collaboration
 
 ## Crawling
 - robots: https://developer.sedifex.com/robots.txt
