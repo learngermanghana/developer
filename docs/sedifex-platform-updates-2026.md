@@ -1,13 +1,13 @@
 ---
 title: Sedifex Platform Updates 2026
-description: Current public integration model for client websites, orders, bookings, payments, webhooks, and developer setup.
+description: Current public integration model for client websites, orders, bookings, payments, event planning, webhooks, and developer setup.
 ---
 
 # Sedifex Platform Updates 2026
 
-This document summarizes the public Sedifex platform model for external developers building client websites, WordPress stores, booking forms, and backend integrations.
+This document summarizes the public Sedifex platform model for external developers building client websites, WordPress stores, booking forms, event workflows, and backend integrations.
 
-Internal Sedifex team-only systems are not documented here.
+Internal Sedifex team-only systems are not documented here unless they are necessary to understand a public workflow.
 
 ## 1. Source-of-truth model
 
@@ -20,6 +20,7 @@ Use this mapping for public/client integrations:
 | Service bookings from client websites | `integrationBookings` | Appointments, school registrations, service requests, and scheduled bookings. |
 | Lead-only requests | `checkoutRequests` | Enquiries that are not paid orders or confirmed bookings. |
 | Webhook logs | `integrationWebhookEvents` | Debug/audit only, not the customer order record. |
+| Event planning | `stores/{storeId}/events/{eventId}` plus event subcollections | Event brief, client portal, checklist, run sheet, program, revisions, change requests, and collaboration activity. |
 
 Do not store product purchases as bookings. Do not treat webhook logs as the permanent source of truth.
 
@@ -128,3 +129,41 @@ Before launching a client website integration:
 - Webhooks verify signatures.
 - Logs capture `x-sedifex-request-id`.
 - Customer success page shows reference, amount, and friendly status.
+
+## 10. Event Planning and client collaboration
+
+Sedifex Event Planning now includes a secure client-collaboration workflow. The reference guide is:
+
+```txt
+docs/event-planning-client-collaboration.md
+```
+
+Key concepts developers should preserve:
+
+```txt
+Staff event workspace
+-> Client Portal / Checklist / Run Sheet / Program / Event Details / Evaluation
+
+Client portal
+-> My Event / Program / My Tasks / Updates
+```
+
+The client can edit approved live-brief fields, view published programs, optionally approve a program, request program changes, complete shared checklist tasks, and view collaboration updates.
+
+Checklist tasks remain private unless explicitly marked client-visible.
+
+Client task completion uses a simple flow:
+
+```txt
+I have done this
+-> optional note
+-> Send to event team
+-> Waiting for confirmation
+-> staff verifies OR returns with a note
+```
+
+Program publishing and client approval are separate. Staff can publish a program without requiring approval; if approval is required, it is tied to the exact published revision/content.
+
+Program editing uses protected revision history and server-side concurrency checks. Do not rely on stale browser state to decide whether a published program must be archived.
+
+The public client portal is rendered by Firebase Functions, so a merged Function change is not live on `cloudfunctions.net` until the main-branch Firebase Functions deployment completes successfully.
