@@ -417,5 +417,5 @@ Before shipping Event Planning/client portal changes, verify:
 - staff return notes appear to the client;
 - verified-only progress is labelled `tasks verified`;
 - security docs acknowledge that `clientPortal.publicUrl` currently contains a recoverable active bearer token for authorized staff use;
-- Functions tests pass before merge;
+- from a clean checkout, run `npm --prefix functions run build` and then `npm --prefix functions run test:event-client`; the client collaboration renderer regression suite must pass;
 - Firebase Functions production deployment completes before announcing a client-portal change as live.
