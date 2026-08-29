@@ -72,11 +72,29 @@ The public client portal does not receive unrestricted Firestore access.
 The model is:
 
 ```txt
-Client sends secure portal token
--> Firebase Function validates active portal link
+Store shares portal
+-> Sedifex generates a random bearer token
+-> eventClientLinks/{tokenHash} stores the validation record keyed by the token hash
+-> stores/{storeId}/events/{eventId}.clientPortal.publicUrl stores the full active URL, including the raw bearer token, so authorized store staff can copy/open it
+-> client sends secure portal token to the HTTPS Function
+-> Function validates the active portal link and event binding
 -> Function reads/writes only allowed event fields
 -> client receives sanitized portal data/HTML
 ```
+
+The validation hash and the persisted staff-facing URL serve different purposes. The current implementation does **not** make the active credential non-recoverable because the token remains present inside `clientPortal.publicUrl`.
+
+### Security consequence
+
+Treat `clientPortal.publicUrl` as a secret-bearing field:
+
+- Any authorized store user who can read the event document can recover and use the active client portal credential.
+- Do not include the tokenized URL in public APIs, client-sanitized payloads, public logs, analytics events, or unauthenticated support output.
+- Event-document read access must remain limited to authorized store members.
+- Resharing/rotating the portal should replace the active credential and invalidate the previous link.
+- Do not describe the implementation as “hash-only token storage” while `clientPortal.publicUrl` persists the full tokenized URL.
+
+If a future hardening change removes raw-token persistence, the existing staff **Copy client link / Open client view** workflow will need an alternative such as one-time display, explicit regeneration, or encrypted/secret storage.
 
 The public portal must not expose internal finance, staffing, vendor negotiation, or unshared checklist data.
 
@@ -358,7 +376,13 @@ programChangeRequests
 clientActivity
 ```
 
-Secure portal link metadata is maintained separately so public access can be validated without granting direct event-document access.
+Portal validation metadata is keyed separately under:
+
+```txt
+eventClientLinks/{tokenHash}
+```
+
+The event document also persists `clientPortal`, including `clientPortal.publicUrl`. Because that URL contains the active raw bearer token, access to the event document is part of the portal credential security boundary.
 
 ## 16. Deployment notes
 
@@ -392,5 +416,6 @@ Before shipping Event Planning/client portal changes, verify:
 - submitted tasks remain awaiting confirmation until staff verifies them;
 - staff return notes appear to the client;
 - verified-only progress is labelled `tasks verified`;
+- security docs acknowledge that `clientPortal.publicUrl` currently contains a recoverable active bearer token for authorized staff use;
 - Functions tests pass before merge;
 - Firebase Functions production deployment completes before announcing a client-portal change as live.
