@@ -330,9 +330,9 @@ This avoids losing client input during the refresh cycle.
 
 ## 14. Core implementation map
 
-The reference implementation lives in the core Sedifex repository.
+The reference implementation lives in the core Sedifex repository: `learngermanghana/sedifex`. The `learngermanghana/developer` repository contains documentation and does not include the `functions/` source tree.
 
-Important frontend files:
+Important frontend files in `learngermanghana/sedifex`:
 
 ```txt
 web/src/pages/EventPlanning.tsx
@@ -343,7 +343,7 @@ web/src/components/EventClientCollaborationDock.tsx
 web/src/utils/eventProgramFingerprint.ts
 ```
 
-Important Firebase Functions files:
+Important Firebase Functions files in `learngermanghana/sedifex`:
 
 ```txt
 functions/src/eventClientCollaboration.ts
@@ -352,7 +352,7 @@ functions/src/eventProgramCollaboration.ts
 functions/src/eventProgramApproval.ts
 ```
 
-Important regression test:
+Important regression test in `learngermanghana/sedifex`:
 
 ```txt
 functions/test/eventClientCollaboration.test.js
@@ -417,5 +417,5 @@ Before shipping Event Planning/client portal changes, verify:
 - staff return notes appear to the client;
 - verified-only progress is labelled `tasks verified`;
 - security docs acknowledge that `clientPortal.publicUrl` currently contains a recoverable active bearer token for authorized staff use;
-- from a clean checkout, run `npm --prefix functions run build` and then `npm --prefix functions run test:event-client`; the client collaboration renderer regression suite must pass;
+- in a clean checkout of the **core `learngermanghana/sedifex` repository** (run the commands from that repository root, not from `learngermanghana/developer`), run `npm --prefix functions run build` and then `npm --prefix functions run test:event-client`; the client collaboration renderer regression suite must pass;
 - Firebase Functions production deployment completes before announcing a client-portal change as live.
